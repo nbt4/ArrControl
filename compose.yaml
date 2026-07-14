@@ -1,0 +1,45 @@
+name: arrcontrol
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-arrcontrol}
+      POSTGRES_USER: ${POSTGRES_USER:-arrcontrol}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-arrcontrol} -d ${POSTGRES_DB:-arrcontrol}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  app:
+    image: ghcr.io/nbt4/arrcontrol:${ARRCONTROL_TAG:-latest}
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__Database: Host=db;Port=5432;Database=${POSTGRES_DB:-arrcontrol};Username=${POSTGRES_USER:-arrcontrol};Password=${POSTGRES_PASSWORD}
+      Auth__JwtSigningKey: ${ARRCONTROL_JWT_SIGNING_KEY}
+      Bootstrap__AdminEmail: ${ARRCONTROL_ADMIN_EMAIL}
+      Bootstrap__AdminPassword: ${ARRCONTROL_ADMIN_PASSWORD}
+      Auth__Oidc__Enabled: ${ARRCONTROL_OIDC_ENABLED:-false}
+      Auth__Oidc__Authority: ${ARRCONTROL_OIDC_AUTHORITY:-}
+      Auth__Oidc__ClientId: ${ARRCONTROL_OIDC_CLIENT_ID:-}
+      Auth__Oidc__ClientSecret: ${ARRCONTROL_OIDC_CLIENT_SECRET:-}
+      App__PublicUrl: ${ARRCONTROL_PUBLIC_URL:-http://localhost:8080}
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+volumes:
+  postgres-data:

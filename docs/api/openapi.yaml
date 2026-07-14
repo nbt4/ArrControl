@@ -1,0 +1,58 @@
+openapi: 3.1.0
+info:
+  title: ArrControl API
+  version: 0.1.0
+  license: { name: MIT }
+servers: [{ url: /api/v1 }]
+security: [{ cookieAuth: [] }]
+paths:
+  /system/status:
+    get:
+      security: []
+      operationId: getSystemStatus
+      responses: { '200': { description: Runtime status, content: { application/json: { schema: { $ref: '#/components/schemas/SystemStatus' } } } } }
+  /instances:
+    get:
+      operationId: listInstances
+      responses: { '200': { description: Instances, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Instance' } } } } } }
+    post:
+      operationId: createInstance
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreateInstance' } } } }
+      responses: { '201': { description: Created }, '400': { $ref: '#/components/responses/Problem' } }
+  /instances/{instanceId}/probe:
+    post:
+      operationId: probeInstance
+      parameters: [{ $ref: '#/components/parameters/InstanceId' }]
+      responses: { '200': { description: Capability and health probe }, '404': { $ref: '#/components/responses/Problem' } }
+  /missing:
+    get:
+      operationId: listMissing
+      parameters: [{ name: cursor, in: query, schema: { type: string } }, { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }]
+      responses: { '200': { description: Cursor page of missing items } }
+  /queue:
+    get:
+      operationId: listQueue
+      responses: { '200': { description: Aggregated queue snapshot } }
+  /operations/search:
+    post:
+      operationId: startSearchOperation
+      parameters: [{ name: Idempotency-Key, in: header, required: true, schema: { type: string, maxLength: 128 } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [targets], properties: { targets: { type: array, maxItems: 10000, items: { type: string, format: uuid } }, dryRun: { type: boolean, default: false } } } } } }
+      responses: { '202': { description: Operation accepted }, '409': { $ref: '#/components/responses/Problem' } }
+  /operations/{operationId}:
+    get:
+      operationId: getOperation
+      parameters: [{ name: operationId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { '200': { description: Operation and per-target outcomes }, '404': { $ref: '#/components/responses/Problem' } }
+components:
+  securitySchemes:
+    cookieAuth: { type: apiKey, in: cookie, name: arrcontrol_session }
+  parameters:
+    InstanceId: { name: instanceId, in: path, required: true, schema: { type: string, format: uuid } }
+  responses:
+    Problem: { description: RFC 9457 problem details, content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } } }
+  schemas:
+    SystemStatus: { type: object, required: [name,status,utc], properties: { name: { const: ArrControl }, status: { enum: [ok,degraded] }, version: { type: string }, utc: { type: string, format: date-time } } }
+    Instance: { type: object, required: [id,name,kind,baseUrl,enabled], properties: { id: { type: string, format: uuid }, name: { type: string }, kind: { type: string }, baseUrl: { type: string, format: uri }, enabled: { type: boolean }, credentialsConfigured: { type: boolean } } }
+    CreateInstance: { type: object, additionalProperties: false, required: [name,kind,baseUrl,credential], properties: { name: { type: string, maxLength: 120 }, kind: { type: string }, baseUrl: { type: string, format: uri }, credential: { type: string, writeOnly: true } } }
+    Problem: { type: object, properties: { type: { type: string, format: uri-reference }, title: { type: string }, status: { type: integer }, detail: { type: string }, traceId: { type: string }, code: { type: string } } }

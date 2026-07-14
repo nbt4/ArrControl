@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/ArrControl.Domain/ArrControl.Domain.csproj" />
+    <Project Path="src/ArrControl.Application/ArrControl.Application.csproj" />
+    <Project Path="src/ArrControl.Infrastructure/ArrControl.Infrastructure.csproj" />
+    <Project Path="src/ArrControl.Api/ArrControl.Api.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/ArrControl.UnitTests/ArrControl.UnitTests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,13 @@
+.env
+**/bin/
+**/obj/
+**/node_modules/
+**/dist/
+**/*.tsbuildinfo
+.idea/
+.vscode/
+coverage/
+artifacts/
+*.user
+*.suo
+*.log
