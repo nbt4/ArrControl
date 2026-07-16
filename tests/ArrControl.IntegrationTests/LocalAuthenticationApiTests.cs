@@ -741,6 +741,10 @@ public sealed class AuthApiDatabaseFixture : IAsyncLifetime
         var connectionStringBuilder = new NpgsqlConnectionStringBuilder(database.GetConnectionString())
         {
             SearchPath = schema,
+            // Each scenario receives a distinct schema and connection string. Keeping a
+            // pool for every disposed WebApplicationFactory eventually exhausts the
+            // PostgreSQL test container's connection limit in a complete test run.
+            Pooling = false,
         };
         return connectionStringBuilder.ConnectionString;
     }

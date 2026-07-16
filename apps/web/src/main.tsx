@@ -211,8 +211,13 @@ function MissingScreen({ authorized }: { authorized: boolean }) {
   useEffect(() => {
     if (!authorized) return;
     const controller = new AbortController();
-    setFailed(false);
-    listMissing(search).then(setData).catch(() => { if (!controller.signal.aborted) setFailed(true); });
+    listMissing(search)
+      .then((response) => {
+        if (controller.signal.aborted) return;
+        setData(response);
+        setFailed(false);
+      })
+      .catch(() => { if (!controller.signal.aborted) setFailed(true); });
     return () => controller.abort();
   }, [authorized, search]);
   if (!authorized) return <LoginPanel onSuccess={() => window.location.reload()} />;
@@ -466,7 +471,6 @@ function CreateInstanceForm({ onCreated }: { onCreated: () => void }) {
 function InstanceList({ canManage, instances, onChanged }: {
   canManage: boolean; instances: readonly InstanceSummary[]; onChanged: () => void;
 }) {
-  const { t } = useTranslation();
   return (
     <div className="instance-list">
       {instances.map((instance) => (

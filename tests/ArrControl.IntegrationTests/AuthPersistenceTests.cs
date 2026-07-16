@@ -196,6 +196,7 @@ public sealed class AuthPersistenceTests(AuthDatabaseFixture database) : IClassF
             .ToListAsync());
         var administratorRole = Assert.Single(await verificationContext.Set<RoleEntity>()
             .AsNoTracking()
+            .Where(x => x.NormalizedName == LocalIdentityConstants.AdministratorRoleNormalizedName)
             .ToListAsync());
         var assignment = Assert.Single(await verificationContext.Set<UserRoleEntity>()
             .AsNoTracking()
