@@ -111,7 +111,7 @@ else
     --workdir /src \
     --env "ConnectionStrings__Database=$(connection arrcontrol_upgrade)" \
     mcr.microsoft.com/dotnet/sdk:9.0 sh -lc \
-    'dotnet tool restore >/dev/null && dotnet ef database update 20260714221653_InitialFoundation --project src/ArrControl.Infrastructure --startup-project src/ArrControl.Api --no-build'
+    'dotnet tool restore >/dev/null && dotnet ef database update 20260714221653_InitialFoundation --project src/ArrControl.Infrastructure --startup-project src/ArrControl.Api --configuration Release --no-build'
 fi
 
 psql_db arrcontrol_upgrade >/dev/null <<'SQL'
