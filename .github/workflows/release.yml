@@ -1,30 +1,66 @@
 name: release-image
+
 on:
   push:
     tags: ['v*.*.*']
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   contents: read
   packages: write
   id-token: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: nbt4/arrcontrol
+
 jobs:
-  image:
+  validate:
+    name: Validate release approval and version
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
-        with: { registry: ghcr.io, username: '${{ github.actor }}', password: '${{ secrets.GITHUB_TOKEN }}' }
-      - id: meta
-        uses: docker/metadata-action@v5
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Match tag, source version, and review approval
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_version="$(sed -n 's:.*<VersionPrefix>\([^<]*\)</VersionPrefix>.*:\1:p' Directory.Build.props)"
+          test "${GITHUB_REF_NAME}" = "v${source_version}"
+          grep --fixed-strings --line-regexp 'Status: approved' docs/release/SECURITY_REVIEW.md
+          grep --fixed-strings "Candidate: \`${source_version}\`" docs/release/V1_COMPATIBILITY_REPORT.md
+
+  image:
+    name: Signed multi-architecture image
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: validate
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
+      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+      - name: Log in to GHCR
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
         with:
-          images: ghcr.io/nbt4/arrcontrol
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
             type=raw,value=latest,enable=${{ !contains(github.ref_name, '-') }}
-      - uses: docker/build-push-action@v6
+      - id: push
+        name: Build and push image, SBOM, and provenance
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
           file: deploy/Dockerfile
@@ -34,3 +70,59 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           provenance: mode=max
           sbom: true
+      - name: Scan published image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.push.outputs.digest }}
+          format: table
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+      - name: Sign immutable image digest with GitHub OIDC
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: cosign sign --yes "${IMAGE}@${DIGEST}"
+      - name: Verify keyless signature identity
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          DIGEST: ${{ steps.push.outputs.digest }}
+          IDENTITY: ${{ github.server_url }}/${{ github.repository }}/.github/workflows/release.yml@${{ github.ref }}
+        run: >-
+          cosign verify
+          --certificate-identity "${IDENTITY}"
+          --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
+          "${IMAGE}@${DIGEST}"
+      - name: Verify amd64 and arm64 manifest entries
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          docker buildx imagetools inspect --raw "${IMAGE}@${DIGEST}" > manifest.json
+          jq --exit-status '([.manifests[].platform.architecture] | index("amd64")) != null' manifest.json
+          jq --exit-status '([.manifests[].platform.architecture] | index("arm64")) != null' manifest.json
+      - name: Capture immutable release evidence
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          cosign verify \
+            --certificate-identity "${{ github.server_url }}/${{ github.repository }}/.github/workflows/release.yml@${{ github.ref }}" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+            --output json "${IMAGE}@${DIGEST}" > signature.json
+          cp docs/release/V1_COMPATIBILITY_REPORT.md compatibility-report.md
+          jq -n --arg tag "${GITHUB_REF_NAME}" --arg image "${IMAGE}" --arg digest "${DIGEST}" \
+            '{tag: $tag, image: $image, digest: $digest, platforms: ["linux/amd64", "linux/arm64"]}' \
+            > release-evidence.json
+      - name: Upload release evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: arrcontrol-${{ github.ref_name }}-release-evidence
+          path: |
+            compatibility-report.md
+            manifest.json
+            release-evidence.json
+            signature.json
+          if-no-files-found: error
+          retention-days: 90

@@ -31,11 +31,13 @@ Each module owns its tables and application commands. Cross-module reads use exp
 
 ## Request and synchronization paths
 
-Reads hit local projections and include `observedAt`, `sourceUpdatedAt`, and `stale`. Poll workers acquire per-instance leases, call adapters under timeout/rate-limit policies, normalize responses, and atomically advance checkpoints. User commands create an operation record, authorize against instance scope, dispatch provider calls, and persist outcome/audit events.
+Reads hit local projections and include `observedAt`, `sourceUpdatedAt`, and `stale`. Poll workers acquire per-instance leases, call adapters under timeout/rate-limit policies, normalize responses, and atomically advance checkpoints. Contract-supported Arr library endpoints have no dependable delta cursor, so their catalog worker computes a complete, bounded snapshot and applies a fingerprint-based local diff; an incomplete upstream pass is rejected before deletion. User commands create an operation record, authorize against instance scope, dispatch provider calls, and persist outcome/audit events.
 
 ## Provider boundary
 
 Adapters implement narrow capability interfaces rather than one oversized interface. Raw payloads may be retained briefly for diagnosis but never become the domain model. Unknown enum values map to `unknown` and are recorded, preventing upstream additions from crashing synchronization.
+
+Non-HTTP tools use a separate boundary instead of pretending to be service instances. The Recyclarr adapter invokes only allowlisted CLI commands through a shell-free process runner, while HTTP instance probing, SSRF policy, credentials, and capabilities remain exclusive to remotely addressable providers.
 
 ## Consistency and idempotency
 

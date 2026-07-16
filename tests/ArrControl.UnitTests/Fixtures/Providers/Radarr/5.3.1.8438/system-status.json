@@ -1,0 +1,11 @@
+{
+  "appName": "Radarr",
+  "instanceName": "Radarr",
+  "version": "5.3.1.8438",
+  "branch": "master",
+  "buildTime": "2023-12-01T00:00:00Z",
+  "isProduction": true,
+  "isDocker": true,
+  "urlBase": "/radarr",
+  "migrationVersion": 234
+}

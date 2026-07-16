@@ -1,0 +1,44 @@
+name: performance
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '41 3 * * 6'
+
+concurrency:
+  group: performance-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  capacity:
+    name: Reference capacity envelope
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5.2.0
+        with:
+          dotnet-version: '9.0.x'
+      - name: Restore
+        run: dotnet restore ArrControl.slnx
+      - name: Build capacity suite
+        run: dotnet build tests/ArrControl.IntegrationTests/ArrControl.IntegrationTests.csproj -c Release --no-restore
+      - name: Run capacity envelope
+        env:
+          ARRCONTROL_RUN_PERFORMANCE_TESTS: '1'
+        run: >-
+          dotnet test tests/ArrControl.IntegrationTests/ArrControl.IntegrationTests.csproj
+          -c Release --no-build
+          --filter FullyQualifiedName~PerformanceEnvelopeTests
+          --logger "trx;LogFileName=performance.trx"
+      - name: Upload measurement result
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: performance-result
+          path: tests/ArrControl.IntegrationTests/TestResults/performance.trx
+          if-no-files-found: error
+          retention-days: 30

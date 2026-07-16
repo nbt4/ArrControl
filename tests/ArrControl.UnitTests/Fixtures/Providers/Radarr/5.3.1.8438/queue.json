@@ -1,0 +1,1 @@
+{"page":1,"pageSize":1000,"totalRecords":1,"records":[{"id":511,"movieId":12,"title":"Fixture.Movie.Download","downloadId":"MOVIE-123","status":"queued","trackedDownloadStatus":"ok","trackedDownloadState":"downloading","protocol":"torrent","size":2000,"sizeleft":1500,"added":"2026-07-16T12:10:00Z"}]}

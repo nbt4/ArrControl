@@ -1,0 +1,4 @@
+[
+  { "id": 11, "tmdbId": 1100, "imdbId": "tt0001100", "title": "Present Movie", "titleSlug": "present-movie", "status": "released", "year": 2023, "monitored": true, "hasFile": true, "added": "2024-01-01T00:00:00Z", "digitalRelease": "2023-06-01T00:00:00Z" },
+  { "id": 12, "tmdbId": 1200, "title": "Missing Movie", "titleSlug": "missing-movie", "status": "announced", "year": 2026, "monitored": true, "hasFile": false, "added": "2026-01-01T00:00:00Z", "inCinemas": "2026-09-01T00:00:00Z" }
+]

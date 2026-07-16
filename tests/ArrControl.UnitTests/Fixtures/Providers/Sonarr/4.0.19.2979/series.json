@@ -1,0 +1,18 @@
+[
+  {
+    "id": 42,
+    "title": "Fixture Series",
+    "titleSlug": "fixture-series",
+    "status": "future-provider-status",
+    "overview": "A contract fixture.",
+    "year": 2024,
+    "monitored": true,
+    "tvdbId": 4200,
+    "added": "2025-01-02T03:04:05Z",
+    "statistics": { "episodeFileCount": 1, "episodeCount": 2, "nextAiring": "2026-08-01T20:00:00Z" },
+    "seasons": [
+      { "seasonNumber": 0, "monitored": false, "statistics": { "episodeFileCount": 0, "episodeCount": 0 } },
+      { "seasonNumber": 1, "monitored": true, "statistics": { "episodeFileCount": 1, "episodeCount": 2 } }
+    ]
+  }
+]

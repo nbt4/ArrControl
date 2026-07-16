@@ -1,0 +1,69 @@
+export const de = {
+  app: {
+    brand: 'ArrControl',
+    skipToContent: 'Zum Hauptinhalt springen',
+    navigation: {
+      label: 'Hauptnavigation', overview: 'Übersicht', library: 'Bibliothek', missing: 'Fehlend',
+      queue: 'Warteschlange', health: 'Zustand', audit: 'Audit',
+    },
+    liveApi: 'Live-API-Daten',
+  },
+  preferences: {
+    language: 'Sprache', timezone: 'Zeitzone', save: 'Einstellungen speichern', saving: 'Speichern…',
+    saved: 'Einstellungen gespeichert.', failed: 'Einstellungen konnten nicht gespeichert werden.',
+    locale: { en: 'English', de: 'Deutsch' },
+  },
+  dashboard: {
+    eyebrow: 'BETRIEBSZENTRALE', title: 'ArrControl-Übersicht',
+    subtitle: 'Aktueller Stand der lokalen API, ohne zwischengespeicherte Demowerte.',
+    refresh: 'Aktualisieren', observedAt: 'Erfasst {{date}}', summaryLabel: 'Systemübersicht',
+    metric: {
+      controlPlane: 'Steuerung', online: 'Online', degraded: 'Beeinträchtigt', apiVersion: 'API {{version}}',
+      services: 'Dienste', permissionRequired: 'Berechtigung erforderlich', enabledCount: '{{count}} aktiviert',
+      credentials: 'Zugangsdaten', encryptedKeys: 'Verschlüsselte Anbieter-Schlüssel', tlsExceptions: 'TLS-Ausnahmen',
+      verificationEnabled: 'Überprüfung aktiviert', reviewRecommended: 'Prüfung empfohlen',
+    },
+  },
+  auth: {
+    signedIn: 'ANGEMELDET', signOut: 'Abmelden', signOutFailed: 'Abmeldung fehlgeschlagen. Erneut versuchen.',
+    required: 'ANMELDUNG ERFORDERLICH', title: 'Anmelden, um Dienste zu laden',
+    secureCookies: 'Sichere Sitzungscookies erfordern HTTPS, auch in der lokalen Entwicklung.',
+    email: 'E-Mail', password: 'Passwort', signIn: 'Anmelden',
+    failed: 'Anmeldung fehlgeschlagen. Zugangsdaten und HTTPS-Einrichtung prüfen.',
+  },
+  instance: {
+    accessMissingTitle: 'Kein Instanzzugriff zugewiesen',
+    accessMissingBody: 'Das Konto ist aktiv, besitzt aber keine instances.read-Berechtigung.',
+    emptyTitle: 'Keine Dienste eingerichtet',
+    emptyBody: 'Die Instanz-API oder ein Administratorkonto verwenden, um den ersten Anbieter hinzuzufügen.',
+    enabled: 'Aktiviert', disabled: 'Deaktiviert', keyConfigured: 'Schlüssel eingerichtet', keyMissing: 'Schlüssel fehlt',
+    tlsVerified: 'TLS geprüft', tlsBypass: 'TLS umgangen',
+  },
+  import: {
+    guidance: {
+      check_download_client: 'Konfigurierten Download-Client und seine Verbindung prüfen.',
+      review_upstream_import: 'Importdetails beim Quellanbieter prüfen.',
+      wait_or_review_upstream: 'Auf den ausstehenden Import warten oder ihn beim Quellanbieter prüfen.',
+      review_upstream: 'Diagnosestatus beim Quellanbieter prüfen.',
+      search_again: 'Fehlgeschlagenen Download vor einer erneuten Suche prüfen.',
+    },
+  },
+  health: {
+    eyebrow: 'ZUSTAND', title: 'Aktive Vorfälle', activeCount: '{{count}} aktiv',
+    emptyTitle: 'Keine aktiven Vorfälle', emptyBody: 'Die letzten Anbieter-Prüfungen melden keine Probleme.',
+    lastSeen: 'Zuletzt gesehen {{date}}', remediation: 'Anleitung öffnen', acknowledge: 'Bestätigen',
+    unacknowledge: 'Bestätigung aufheben', snooze: '24 Stunden ausblenden', unsnooze: 'Ausblendung aufheben',
+    sources: '{{count}} Quelle(n)', actionFailed: 'Der Vorfall konnte nicht aktualisiert werden.',
+    severity: { ok: 'OK', notice: 'Hinweis', warning: 'Warnung', error: 'Fehler', unknown: 'Unbekannt' },
+  },
+  audit: {
+    eyebrow: 'AUDIT', title: 'Letzte Audit-Ereignisse', export: 'Redigierte Diagnose exportieren',
+    exportFailed: 'Das Diagnosearchiv konnte nicht erstellt werden.', details: 'Redigierte Details',
+    emptyTitle: 'Keine aktuellen Audit-Ereignisse', emptyBody: 'Keine Ereignisse im standardmäßigen 30-Tage-Zeitraum.',
+  },
+  state: {
+    loadingTitle: 'Aktueller Stand wird geladen', loadingBody: 'ArrControl-API wird kontaktiert…',
+    errorTitle: 'API-Daten sind nicht verfügbar',
+    errorBody: 'Es werden keine Platzhalterwerte angezeigt. Bereitschaft prüfen und erneut versuchen.', retry: 'Erneut versuchen',
+  },
+} as const;

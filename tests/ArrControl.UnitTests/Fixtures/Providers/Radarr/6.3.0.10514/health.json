@@ -1,0 +1,10 @@
+[
+  {
+    "id": 41,
+    "source": "RootFolderCheck",
+    "type": "ok",
+    "message": "Root folder is available.",
+    "wikiUrl": "https://wiki.servarr.com/radarr/system#health",
+    "futureField": { "ignored": true }
+  }
+]

@@ -14,7 +14,7 @@ Lidarr/Readarr/Whisparr/Prowlarr/Bazarr, SABnzbd/NZBGet/qBittorrent/Transmission
 
 ## v0.4 Media and integrations
 
-Plex/Jellyfin/Emby, Overseerr/Jellyseerr/Ombi, Recyclarr, notifications, calendar and statistics.
+Delivered provider slices: Plex/Jellyfin/Emby, Overseerr/Jellyseerr/Ombi, notifications, and the separate Recyclarr CLI boundary. Remaining integration work: notification routing/preferences, calendar, and statistics.
 
 ## v1.0 Stable
 

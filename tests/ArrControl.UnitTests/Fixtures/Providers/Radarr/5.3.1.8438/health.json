@@ -1,0 +1,9 @@
+[
+  {
+    "id": 31,
+    "source": "IndexerStatusCheck",
+    "type": "error",
+    "message": "An indexer is unavailable.",
+    "wikiUrl": "https://wiki.servarr.com/radarr/system#health"
+  }
+]

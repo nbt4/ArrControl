@@ -1,0 +1,13 @@
+{
+  "appName": "Radarr",
+  "instanceName": "Movies",
+  "version": "6.3.0.10514",
+  "branch": "master",
+  "buildTime": "2026-07-01T00:00:00Z",
+  "isProduction": true,
+  "isDocker": true,
+  "databaseType": "postgres",
+  "databaseVersion": "17.5",
+  "runtimeName": "netcore",
+  "futureCompatibleField": [1, 2, 3]
+}

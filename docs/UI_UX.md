@@ -16,10 +16,13 @@ Primary navigation: Overview, Library, Missing, Queue, Imports, Search, Calendar
 - Health: incident groups, affected instances, first/last seen, source details, remediation links, acknowledge/snooze.
 - Search: canonical title search, target instances, release comparison, rejection explanations, explicit grab confirmation.
 - Settings: onboarding wizard, connection test, capability report, secret replacement, local/OIDC auth, roles, schedules, retention.
+- Audit: descending recent timeline, structured redacted details, exact server-side filters/pagination, and an explicit strict-redaction diagnostics export for global audit readers.
 
 ## Interaction rules
 
 Every mutation reports pending/succeeded/partial/failed with an operation ID. Bulk actions show target count and scope before execution. Destructive actions require typed or contextual confirmation according to risk. Cached data always displays its observation time. Empty, loading, stale, permission-denied, partial, and upstream-offline states are specified for every data view.
+
+The browser obtains the live snapshot waterline before loading REST projections, then opens the same-origin SSE stream from that cursor. Resource invalidations are debounced before refreshing visible data. Native EventSource reconnect carries `Last-Event-ID`; `snapshot-required` restarts the waterline/REST/stream sequence instead of attempting to merge an incomplete replay.
 
 ## Localization
 
@@ -27,4 +30,4 @@ Translation keys are semantic (`queue.status.downloading`), never English source
 
 ## Accessibility and responsive behavior
 
-WCAG 2.2 AA: visible focus, keyboard tables/actions, 44px touch targets, semantic landmarks, reduced-motion support, non-color status cues, and contrast-tested tokens. Desktop tables become prioritized cards below 720px; filters use a drawer without losing state.
+WCAG 2.2 AA: visible focus, keyboard tables/actions, 44px touch targets, semantic landmarks, reduced-motion support, non-color status cues, and contrast-tested tokens. Desktop tables become prioritized cards below 720px; filters use a drawer without losing state. `docs/ACCESSIBILITY.md` records the audited baseline, evidence, release gate, and the limits of automated conformance checks.

@@ -1,0 +1,1 @@
+[{"id":12,"authorId":8,"title":"Missing Book","foreignBookId":"book-12","monitored":true,"releaseDate":"2025-02-01T00:00:00Z","statistics":{"bookFileCount":0,"totalBookCount":1}},{"id":13,"authorId":8,"title":"Complete Book","foreignBookId":"book-13","monitored":true,"releaseDate":"2024-02-01T00:00:00Z","statistics":{"bookFileCount":1,"totalBookCount":1}}]

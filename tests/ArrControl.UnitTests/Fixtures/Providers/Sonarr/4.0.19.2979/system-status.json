@@ -1,0 +1,13 @@
+{
+  "appName": "Sonarr",
+  "instanceName": "Television",
+  "version": "4.0.19.2979",
+  "branch": "main",
+  "buildTime": "2026-06-30T00:00:00Z",
+  "isProduction": true,
+  "isDocker": true,
+  "databaseType": "postgres",
+  "databaseVersion": "17.5",
+  "runtimeName": "netcore",
+  "futureCompatibleField": { "ignored": true }
+}

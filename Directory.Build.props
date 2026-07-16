@@ -4,5 +4,6 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <AnalysisLevel>latest</AnalysisLevel>
+    <VersionPrefix>1.0.0</VersionPrefix>
   </PropertyGroup>
 </Project>

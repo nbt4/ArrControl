@@ -6,6 +6,8 @@
     <Project Path="src/ArrControl.Api/ArrControl.Api.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/ArrControl.AuthentikIntegrationTests/ArrControl.AuthentikIntegrationTests.csproj" />
+    <Project Path="tests/ArrControl.IntegrationTests/ArrControl.IntegrationTests.csproj" />
     <Project Path="tests/ArrControl.UnitTests/ArrControl.UnitTests.csproj" />
   </Folder>
 </Solution>
