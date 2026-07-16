@@ -4,7 +4,7 @@ Use `ADMIN_GUIDE.md` for the end-to-end administrator workflow, `OPERATOR_GUIDE.
 
 ## Images and tags
 
-GitHub Actions builds `ghcr.io/nbt4/arrcontrol`. Pull requests and `main` build/test without publishing; semantic tags publish the exact version, major/minor aliases, and `latest` only for stable releases. Release images target linux/amd64 and linux/arm64, run non-root, include OCI labels plus BuildKit SBOM/max-level provenance attestations, and are signed by Cosign with the tag workflow's short-lived GitHub OIDC identity. Workflow actions are pinned to full commits and updated by Dependabot.
+GitHub Actions builds `nobentie/arrcontrol` on Docker Hub and `ghcr.io/nbt4/arrcontrol`. Pull requests and `main` build/test without publishing; semantic tags publish the exact version, major/minor aliases, and `latest` only for stable releases. Release images target linux/amd64 and linux/arm64, run non-root, include OCI labels plus BuildKit SBOM/max-level provenance attestations. Workflow actions are pinned to full commits and updated by Dependabot.
 
 The tag must exactly match `Directory.Build.props`, and publication is blocked until `docs/release/SECURITY_REVIEW.md` records independent approval. The workflow asserts amd64/arm64 entries after push and retains the manifest, compatibility report, digest, and signature verification as release evidence.
 
@@ -13,7 +13,7 @@ The CI image gate loads a single-architecture image locally, proves its configur
 Verify a tagged image independently by digest, substituting the release tag and repository path:
 
 ```text
-docker pull ghcr.io/nbt4/arrcontrol:1.0.0
+docker pull nobentie/arrcontrol:1.0.0
 cosign verify \
   --certificate-identity-regexp '^https://github.com/nbt4/ArrControl/.github/workflows/release.yml@refs/tags/v' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
@@ -22,11 +22,11 @@ cosign verify \
 
 ## Compose lifecycle
 
-Copy `.env.example`, rotate secrets, create the credential key with `umask 077; mkdir -p secrets; openssl rand -base64 32 > secrets/arrcontrol-master-key`, then `docker compose up -d`. Compose waits for PostgreSQL, runs the idempotent `migrate` one-shot to completion, and starts `app` only after a zero exit code. Pin a version in production (`ARRCONTROL_TAG=0.1.0`), not `latest`. Keep the key file owned by the deployment account with mode `0600`; Compose mounts it read-only at `/run/secrets/arrcontrol_master_key`. The complete tested backup, restore, validation, and rollback procedure is in `docs/BACKUP_RESTORE.md`.
+Copy the root `.env.example` to `.env`, rotate secrets, and create the credential key with `umask 077; mkdir -p secrets; openssl rand -base64 32 > secrets/master-key`. Start `arrcontrol-db`, run `docker compose run --rm --no-deps arrcontrol database migrate`, then start ArrControl. Pin `ARRCONTROL_IMAGE` to a version in production, not `latest`. Keep the key file owned by the deployment account with mode `0600`; Compose mounts it read-only at `/run/secrets/arrcontrol_master_key`. The complete tested backup, restore, validation, and rollback procedure is in `docs/BACKUP_RESTORE.md`.
 
 Baseline Compose reserves 256 MiB of shared memory for PostgreSQL so parallel projection queries do not exhaust Docker's small default `/dev/shm`. The validated data/concurrency ceiling and the measurements that support it are in `docs/PERFORMANCE.md`; benchmark the actual host before exceeding that envelope.
 
-For a controlled upgrade, stop `app`, take and verify a database backup, pull the pinned target image, run `docker compose run --rm migrate`, and start `app` only after the command reports success. The same image can run outside Compose as `ArrControl.Api database migrate` with only `ConnectionStrings__Database` configured. The command serializes competing migrators with a five-minute-bounded PostgreSQL advisory lock, logs only migration counts, and is safe to rerun. It does not bootstrap users, start HTTP listeners, or require provider credential keys. Never grant the normal application database account less schema authority than the migration command unless a separate migration connection setting is introduced and documented first.
+For a controlled upgrade, stop `arrcontrol`, take and verify a database backup, pull the pinned target image, run `docker compose run --rm --no-deps arrcontrol database migrate`, and start `arrcontrol` only after the command reports success. The same image can run outside Compose as `ArrControl.Api database migrate` with only `ConnectionStrings__Database` configured. The command serializes competing migrators with a five-minute-bounded PostgreSQL advisory lock, logs only migration counts, and is safe to rerun. It does not bootstrap users, start HTTP listeners, or require provider credential keys. Never grant the normal application database account less schema authority than the migration command unless a separate migration connection setting is introduced and documented first.
 
 `ARRCONTROL_MASTER_KEY_VERSION` selects the version used for new writes. Rotation is additive: mount the new key as another indexed `CredentialEncryption__Keys__N__Version`/`__Path` pair, keep every old version required by existing rows, switch `CredentialEncryption__ActiveKeyVersion`, restart, and rewrite credentials through the API as operationally convenient. Never reuse a version for different bytes and never remove an old key while PostgreSQL still references it. Loss of an old key makes those credentials undecryptable; restoring only the database is insufficient.
 

@@ -1,87 +1,58 @@
-name: arrcontrol
 services:
-  db:
+  arrcontrol-db:
     image: postgres:17-alpine
+    container_name: arrcontrol-db
     restart: unless-stopped
     shm_size: 256mb
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-arrcontrol}
-      POSTGRES_USER: ${POSTGRES_USER:-arrcontrol}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: arrcontrol
+      POSTGRES_USER: arrcontrol
+      POSTGRES_PASSWORD: ${ARRCONTROL_DB_PASSWORD:?Set ARRCONTROL_DB_PASSWORD in .env}
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - ${ARRCONTROL_DATA_DIR:?Set ARRCONTROL_DATA_DIR in .env}/postgres:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-arrcontrol} -d ${POSTGRES_DB:-arrcontrol}"]
+      test: ["CMD-SHELL", "pg_isready -U arrcontrol -d arrcontrol"]
       interval: 10s
       timeout: 5s
       retries: 5
-  migrate:
-    image: ghcr.io/nbt4/arrcontrol:${ARRCONTROL_TAG:-latest}
-    build:
-      context: .
-      dockerfile: deploy/Dockerfile
-    command: ["database", "migrate"]
-    restart: "no"
-    depends_on:
-      db:
-        condition: service_healthy
-    environment:
-      ConnectionStrings__Database: Host=db;Port=5432;Database=${POSTGRES_DB:-arrcontrol};Username=${POSTGRES_USER:-arrcontrol};Password=${POSTGRES_PASSWORD}
-    read_only: true
-    tmpfs:
-      - /tmp
-    security_opt:
-      - no-new-privileges:true
-  app:
-    image: ghcr.io/nbt4/arrcontrol:${ARRCONTROL_TAG:-latest}
-    build:
-      context: .
-      dockerfile: deploy/Dockerfile
+    networks: [arrcontrol-data]
+
+  arrcontrol:
+    image: ${ARRCONTROL_IMAGE:-nobentie/arrcontrol:latest}
+    container_name: arrcontrol
     restart: unless-stopped
     depends_on:
-      migrate:
-        condition: service_completed_successfully
-    ports:
-      - "8080:8080"
+      arrcontrol-db:
+        condition: service_healthy
     environment:
       ASPNETCORE_URLS: http://+:8080
-      ConnectionStrings__Database: Host=db;Port=5432;Database=${POSTGRES_DB:-arrcontrol};Username=${POSTGRES_USER:-arrcontrol};Password=${POSTGRES_PASSWORD}
-      Bootstrap__AdminEmail: ${ARRCONTROL_ADMIN_EMAIL}
-      Bootstrap__AdminPassword: ${ARRCONTROL_ADMIN_PASSWORD}
-      Auth__Local__AccessTokenLifetime: ${ARRCONTROL_AUTH_ACCESS_TOKEN_LIFETIME:-00:15:00}
-      Auth__Local__RefreshTokenLifetime: ${ARRCONTROL_AUTH_REFRESH_TOKEN_LIFETIME:-30.00:00:00}
-      Auth__Local__LoginFailureWindow: ${ARRCONTROL_AUTH_LOGIN_FAILURE_WINDOW:-00:15:00}
-      Auth__Local__AccountFailureLimit: ${ARRCONTROL_AUTH_ACCOUNT_FAILURE_LIMIT:-5}
-      Auth__Local__IpFailureLimit: ${ARRCONTROL_AUTH_IP_FAILURE_LIMIT:-20}
-      Auth__Local__LoginRequestLimit: ${ARRCONTROL_AUTH_LOGIN_REQUEST_LIMIT:-60}
-      Auth__Local__SessionMutationRequestLimit: ${ARRCONTROL_AUTH_SESSION_MUTATION_REQUEST_LIMIT:-120}
-      Auth__Oidc__Enabled: ${ARRCONTROL_OIDC_ENABLED:-false}
-      Auth__Oidc__Authority: ${ARRCONTROL_OIDC_AUTHORITY:-}
-      Auth__Oidc__ClientId: ${ARRCONTROL_OIDC_CLIENT_ID:-}
-      Auth__Oidc__ClientSecret: ${ARRCONTROL_OIDC_CLIENT_SECRET:-}
-      Auth__Oidc__AdministratorGroup: ${ARRCONTROL_OIDC_ADMIN_GROUP:-}
-      CredentialEncryption__ActiveKeyVersion: ${ARRCONTROL_MASTER_KEY_VERSION:-1}
-      CredentialEncryption__Keys__0__Version: ${ARRCONTROL_MASTER_KEY_VERSION:-1}
+      ConnectionStrings__Database: Host=arrcontrol-db;Port=5432;Database=arrcontrol;Username=arrcontrol;Password=${ARRCONTROL_DB_PASSWORD}
+      Bootstrap__AdminEmail: ${ARRCONTROL_ADMIN_EMAIL:?Set ARRCONTROL_ADMIN_EMAIL in .env}
+      Bootstrap__AdminPassword: ${ARRCONTROL_ADMIN_PASSWORD:?Set ARRCONTROL_ADMIN_PASSWORD in .env}
+      Auth__Oidc__Enabled: "false"
+      CredentialEncryption__ActiveKeyVersion: "1"
+      CredentialEncryption__Keys__0__Version: "1"
       CredentialEncryption__Keys__0__Path: /run/secrets/arrcontrol_master_key
-      App__PublicUrl: ${ARRCONTROL_PUBLIC_URL:-http://localhost:8080}
-      DataProtection__KeysPath: ${ARRCONTROL_DATA_PROTECTION_KEYS_PATH:-/var/lib/arrcontrol/data-protection-keys}
-      Automation__Scheduler__MaximumConcurrency: ${ARRCONTROL_SCHEDULER_MAX_CONCURRENCY:-4}
-      Automation__Scheduler__MaximumAttempts: ${ARRCONTROL_SCHEDULER_MAX_ATTEMPTS:-5}
-      Operations__Audit__RetentionDays: ${ARRCONTROL_AUDIT_RETENTION_DAYS:-365}
-      Operations__Audit__RetentionBatchSize: ${ARRCONTROL_AUDIT_RETENTION_BATCH_SIZE:-1000}
-      Operations__Audit__RetentionMaximumBatches: ${ARRCONTROL_AUDIT_RETENTION_MAXIMUM_BATCHES:-10}
+      App__PublicUrl: ${ARRCONTROL_PUBLIC_URL:?Set ARRCONTROL_PUBLIC_URL in .env}
+      DataProtection__KeysPath: /var/lib/arrcontrol/data-protection-keys
+    expose: ["8080"]
     volumes:
-      - data-protection-keys:/var/lib/arrcontrol/data-protection-keys
-    secrets:
-      - arrcontrol_master_key
+      - ${ARRCONTROL_DATA_DIR}/data-protection:/var/lib/arrcontrol/data-protection-keys
+    secrets: [arrcontrol_master_key]
     read_only: true
-    tmpfs:
-      - /tmp
-    security_opt:
-      - no-new-privileges:true
-volumes:
-  postgres-data:
-  data-protection-keys:
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    networks: [proxy, starr, arrcontrol-data]
+
+networks:
+  # Existing Docker networks from the user's reverse proxy and Arr stack.
+  proxy:
+    external: true
+  starr:
+    external: true
+  arrcontrol-data:
+    internal: true
+
 secrets:
   arrcontrol_master_key:
     file: ${ARRCONTROL_MASTER_KEY_FILE:?Set ARRCONTROL_MASTER_KEY_FILE in .env}
