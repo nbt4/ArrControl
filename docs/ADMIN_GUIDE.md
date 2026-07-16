@@ -4,7 +4,7 @@ This guide covers installation ownership, identity, authorization, instances, li
 
 ## Install and bootstrap
 
-1. Pin an ArrControl image version/digest and PostgreSQL 17. Copy `.env.example`; replace every `CHANGE_ME` value.
+1. Pin an ArrControl image version/digest and PostgreSQL 17. Copy the root `.env.example` to `.env`; replace every `CHANGE_ME` value.
 2. Generate the credential key with `umask 077; mkdir -p secrets; openssl rand -base64 32 > secrets/arrcontrol-master-key`. Keep it mode `0600`, outside source control and backups that contain only public configuration.
 3. Put a trusted HTTPS reverse proxy in front of port 8080. Browser login intentionally does not work over direct HTTP because session cookies are always Secure.
 4. Run `docker compose up --build`. Confirm `migrate` exits zero, `/health/live` is live, and `/health/ready` is healthy.

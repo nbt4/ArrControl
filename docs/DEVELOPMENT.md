@@ -49,7 +49,7 @@ logout:        https://arrcontrol.localhost/auth/oidc/signed-out
 
 Use scopes `openid profile email`. Authentik's default email mapping deliberately emits `email_verified=false`; automatic ArrControl linking therefore needs a custom mapping backed by a genuinely verified user attribute. The default profile mapping supplies group names. Configure the exact administrator group with `ARRCONTROL_OIDC_ADMIN_GROUP`, or indexed mappings such as `Auth__Oidc__RoleMappings__0__Group` and `Auth__Oidc__RoleMappings__0__Role`. Target roles must already exist.
 
-Set `ARRCONTROL_OIDC_ENABLED=true`, the exact trailing-slash per-provider Authority, client ID/secret, `ARRCONTROL_PUBLIC_URL=https://arrcontrol.localhost`, and the Data Protection key path from `.env.example`. Then start login at `/api/v1/auth/oidc/login?returnUrl=/`. Do not put the client secret in source control, logs, shell history, test fixtures, or browser configuration.
+Set `ARRCONTROL_OIDC_ENABLED=true`, the exact trailing-slash per-provider Authority, client ID/secret, `ARRCONTROL_PUBLIC_URL=https://arrcontrol.localhost`, and a Data Protection key path. Then start login at `/api/v1/auth/oidc/login?returnUrl=/`. Do not put the client secret in source control, logs, shell history, test fixtures, or browser configuration.
 
 Fast OIDC tests use an in-process Authentik contract server and real signed tokens. The heavier Authentik suite starts only pinned ephemeral containers with generated credentials and runs provider-focused plus actual ArrControl-handler browser flows; it never reads the normal development `.env` or calls a live provider. See the test project README for its explicit opt-in commands when Docker has at least 2 CPU and 2 GiB available.
 

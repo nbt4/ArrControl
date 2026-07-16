@@ -1,62 +1,94 @@
 # ArrControl
 
-ArrControl is a free, open-source operations center for multiple Arr instances, download clients, and media servers. It unifies missing media, queues, health, searches, scheduled jobs, and audit history without embedding upstream UIs.
+ArrControl is a self-hosted control centre for Arr services, download clients, and media servers. One web interface combines missing items, queues, history, health, and connected services.
 
-This repository is an implementation-ready blueprint **and** a runnable vertical slice. The current foundation includes migrations, local and Authentik-compatible OIDC identity, opaque browser sessions, database-backed RBAC with global and instance-group scopes, an encrypted write-only multi-purpose credential store, scoped instance/group management with a DNS-rebinding-resistant connection probe, typed Arr/supporting/download-client/media-server/request-manager/notification adapters plus a bounded Recyclarr CLI boundary, durable catalog and activity synchronization, an RBAC-scoped cursor-paginated missing API with saved views/freshness, aggregated queue/history with download correlation, durable grouped health incidents with acknowledgement/snooze/remediation, a transactional outbox with RBAC-filtered replayable SSE updates, append-only audit queries/retention and strict-redaction diagnostics export, and an English/German generated-client dashboard with real authentication and persisted locale/timezone preferences; the provider contracts, API contract, delivery pipeline, and backlog define the path to the complete product.
+## Run it online with Docker
 
-## Quick start
+ArrControl needs exactly two running containers: `arrcontrol` and PostgreSQL. The browser interface must be served through HTTPS because secure login cookies intentionally do not work over plain HTTP.
 
-1. Copy `.env.example` to `.env` and change every placeholder secret.
-2. Create the credential master key with `umask 077; mkdir -p secrets; openssl rand -base64 32 > secrets/arrcontrol-master-key`.
-3. Run `docker compose up --build`; the one-shot `migrate` service applies schema changes before the application starts.
-4. Open `http://localhost:8080` (API: `http://localhost:8080/api/v1/system/status`).
+### 1. Download the two configuration files
 
-The direct HTTP port is suitable for status checks but deliberately cannot set the Secure `__Host-` login cookies. Put HTTPS in front of it before testing browser authentication; a concrete Caddy-based local setup is documented in [Local HTTPS for browser authentication](docs/DEVELOPMENT.md#local-https-for-browser-authentication).
+```bash
+mkdir -p /opt/docker/arrcontrol
+cd /opt/docker/arrcontrol
+curl -fsSLO https://raw.githubusercontent.com/nbt4/ArrControl/main/compose.yaml
+curl -fsSLo .env https://raw.githubusercontent.com/nbt4/ArrControl/main/.env.example
+```
 
-For local development, use .NET 9 SDK and Node 22/pnpm 10. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+### 2. Set passwords and create the encryption key
 
-## Add to an existing Arr stack
+Edit `.env` and replace both `CHANGE_ME` values with long random passwords. Set `ARRCONTROL_PUBLIC_URL` to the HTTPS URL you will use.
 
-The published `nobentie/arrcontrol` image contains the browser UI, API, and background workers. A single PostgreSQL container is the only required companion; Authentik, Redis, and message brokers are not required.
+```bash
+mkdir -p /opt/docker/arrcontrol/secrets
+openssl rand -base64 32 > /opt/docker/arrcontrol/secrets/master-key
+chmod 600 /opt/docker/arrcontrol/secrets/master-key
+```
 
-1. Copy [deploy/compose.arr-stack.yaml](deploy/compose.arr-stack.yaml) next to your stack and copy [deploy/arr-stack.env.example](deploy/arr-stack.env.example) to `.env`.
-2. Generate the write-only credential key once: `mkdir -p /opt/docker/arrcontrol/secrets && openssl rand -base64 32 > /opt/docker/arrcontrol/secrets/master-key && chmod 600 /opt/docker/arrcontrol/secrets/master-key`.
-3. Adjust the data path, strong database/admin passwords, and public HTTPS URL. The fragment attaches ArrControl to existing external Docker networks named `proxy` and `starr`; rename those entries if your stack uses different names.
-4. Start the database, apply migrations with the same application image, then start both services:
+### 3. Attach it to your existing Arr/proxy networks
 
-   ```text
-   docker compose -f compose.arr-stack.yaml up -d arrcontrol-db
-   docker compose -f compose.arr-stack.yaml run --rm --no-deps arrcontrol database migrate
-   docker compose -f compose.arr-stack.yaml up -d
-   ```
+The supplied Compose file expects Docker networks named `proxy` and `starr`, as in a typical Arr stack. Create them only when they do not already exist:
 
-Your reverse proxy should forward HTTPS traffic to `arrcontrol:8080` on the `proxy` network. Browser login intentionally does not work over direct HTTP. For Arr containers using `network_mode: service:gluetun`, add their Gluetun service name and published internal port (for example `http://arr_vpn:8989` for Sonarr), then explicitly permit private-network access in ArrControl.
+```bash
+docker network create proxy
+docker network create starr
+```
 
-## Documentation map
+If your networks use different names, change only the two external network names at the bottom of `compose.yaml`.
 
-- [Documentation index](docs/README.md)
-- [User guide](docs/USER_GUIDE.md), [operator guide](docs/OPERATOR_GUIDE.md), and [administrator guide](docs/ADMIN_GUIDE.md)
+### 4. Start the database, migrate once, then start ArrControl
+
+```bash
+docker compose up -d arrcontrol-db
+docker compose run --rm --no-deps arrcontrol database migrate
+docker compose up -d
+```
+
+Use the pinned version in `.env` for normal operation. To test the newest build, set `ARRCONTROL_IMAGE=nobentie/arrcontrol:latest` and run `docker compose pull && docker compose up -d`.
+
+### 5. Point your reverse proxy at ArrControl
+
+Your proxy must reach `http://arrcontrol:8080` over the shared `proxy` network. Example Caddy site:
+
+```caddy
+arrcontrol.example.com {
+    reverse_proxy arrcontrol:8080
+}
+```
+
+Open `https://arrcontrol.example.com`, then sign in with `ARRCONTROL_ADMIN_EMAIL` and `ARRCONTROL_ADMIN_PASSWORD` from `.env`.
+
+For Arr containers behind Gluetun, use the Gluetun service name and its internal port when adding a service, for example `http://arr_vpn:8989` for Sonarr. Enable private-network access for that service in ArrControl.
+
+## Updates
+
+```bash
+cd /opt/docker/arrcontrol
+docker compose pull
+docker compose run --rm --no-deps arrcontrol database migrate
+docker compose up -d
+```
+
+Back up both `${ARRCONTROL_DATA_DIR}/postgres` and `${ARRCONTROL_DATA_DIR}/data-protection` before an update. See [backup and recovery](docs/BACKUP_RESTORE.md) for the full procedure.
+
+## Image tags
+
+| Tag | Intended use |
+| --- | --- |
+| `nobentie/arrcontrol:1.0.0` | Pinned production release |
+| `nobentie/arrcontrol:1.0` | Current 1.0 release line |
+| `nobentie/arrcontrol:latest` | Evaluation / newest release |
+
+Images support `linux/amd64` and `linux/arm64`.
+
+## Documentation
+
+- [Using ArrControl](docs/USER_GUIDE.md)
+- [Administration and accounts](docs/ADMIN_GUIDE.md)
 - [Provider troubleshooting](docs/PROVIDER_TROUBLESHOOTING.md)
-- [Product requirements](docs/SRS.md)
-- [Architecture and decisions](docs/SDD.md)
-- [Data model](docs/DATA_MODEL.md)
-- [Provider architecture](docs/PROVIDERS.md)
-- [API contract](docs/api/openapi.yaml)
-- [UI system](docs/UI_UX.md)
-- [Security and authentication](docs/SECURITY.md)
-- [Threat model and review status](docs/THREAT_MODEL.md)
-- [Security reporting policy](SECURITY.md)
-- [Operations and delivery](docs/OPERATIONS.md)
-- [Backup/restore](docs/BACKUP_RESTORE.md), [capacity evidence](docs/PERFORMANCE.md), and [accessibility audit](docs/ACCESSIBILITY.md)
-- [v1 compatibility report and release checklist](docs/release/V1_COMPATIBILITY_REPORT.md)
-- [Roadmap](docs/ROADMAP.md) and [implementation backlog](TODO.md)
-- [Codex master prompt](.codex/MASTER_PROMPT.md)
-
-## Scope statement
-
-“Support all services” means a stable provider architecture plus the compatibility matrix in `docs/PROVIDERS.md`. Sonarr, Radarr, Lidarr, Readarr, Whisparr, Prowlarr, Bazarr, SABnzbd, NZBGet, qBittorrent, Transmission, Deluge, Plex, Jellyfin, Emby, Overseerr, Jellyseerr/Seerr, and Ombi currently have contract-tested HTTP capability slices; Recyclarr has a separate contract-tested CLI task boundary because upstream exposes no service API. Other providers remain roadmap items until their contract tests pass.
+- [Backup and recovery](docs/BACKUP_RESTORE.md)
+- [Developer and architecture reference](docs/README.md)
 
 ## License
 
-Licensed under the MIT License. Everyone may use, study, modify, and redistribute ArrControl free of charge under its terms. See [LICENSE](LICENSE).
-
+MIT — see [LICENSE](LICENSE).
