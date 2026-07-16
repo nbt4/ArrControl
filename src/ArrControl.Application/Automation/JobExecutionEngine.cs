@@ -70,9 +70,9 @@ public sealed class JobExecutionEngine(
         {
             return await FailAsync(job, exception.Code, stoppingToken);
         }
-        catch
+        catch (Exception exception)
         {
-            return await FailAsync(job, "handler_failed", stoppingToken);
+            return await FailAsync(job, UnexpectedErrorCode(exception), stoppingToken);
         }
         finally
         {
@@ -148,5 +148,19 @@ public sealed class JobExecutionEngine(
         catch (OperationCanceledException)
         {
         }
+    }
+
+    private static string UnexpectedErrorCode(Exception exception)
+    {
+        var name = exception.GetType().Name;
+        var normalized = new string(name
+            .Select(character => char.IsAsciiLetterOrDigit(character)
+                ? char.ToLowerInvariant(character)
+                : '_')
+            .ToArray())
+            .Trim('_');
+        return string.IsNullOrEmpty(normalized)
+            ? "handler_failed"
+            : $"handler_failed_{normalized[..Math.Min(normalized.Length, 96)]}";
     }
 }
