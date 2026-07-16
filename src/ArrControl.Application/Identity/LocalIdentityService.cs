@@ -27,11 +27,6 @@ public sealed class LocalIdentityService(
 
         ValidateNewPassword(password);
 
-        if (await store.IsBootstrapDisabledAsync(cancellationToken))
-        {
-            return BootstrapStatus.AlreadyDisabled;
-        }
-
         var passwordHash = await passwordHasher.HashAsync(password, cancellationToken);
         var status = await store.BootstrapAsync(
             new BootstrapUserRecord(
@@ -44,9 +39,12 @@ public sealed class LocalIdentityService(
             requestContext,
             cancellationToken);
 
-        return status == BootstrapStoreStatus.Created
-            ? BootstrapStatus.Created
-            : BootstrapStatus.AlreadyDisabled;
+        return status switch
+        {
+            BootstrapStoreStatus.Created => BootstrapStatus.Created,
+            BootstrapStoreStatus.Updated => BootstrapStatus.Updated,
+            _ => BootstrapStatus.AlreadyDisabled,
+        };
     }
 
     public async Task<LoginResult> LoginAsync(

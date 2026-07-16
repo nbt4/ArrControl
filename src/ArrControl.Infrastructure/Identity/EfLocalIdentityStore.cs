@@ -34,7 +34,51 @@ public sealed class EfLocalIdentityStore(
             cancellationToken);
         var now = DateTimeOffset.UtcNow;
 
-        if (await dbContext.Set<IdentityBootstrapStateEntity>().AnyAsync(cancellationToken))
+        var bootstrapState = await dbContext.Set<IdentityBootstrapStateEntity>()
+            .SingleOrDefaultAsync(cancellationToken);
+        if (bootstrapState?.AdminUserId is { } bootstrapAdminUserId)
+        {
+            var bootstrapAdmin = await dbContext.Set<UserEntity>()
+                .SingleOrDefaultAsync(x => x.Id == bootstrapAdminUserId, cancellationToken);
+            if (bootstrapAdmin is null)
+            {
+                await transaction.CommitAsync(cancellationToken);
+                return BootstrapStoreStatus.AlreadyDisabled;
+            }
+
+            var conflictingUserExists = await dbContext.Set<UserEntity>()
+                .AnyAsync(
+                    x => x.Id != bootstrapAdmin.Id && x.NormalizedEmail == user.NormalizedEmail,
+                    cancellationToken);
+            if (conflictingUserExists)
+            {
+                throw new InvalidOperationException(
+                    "Bootstrap administrator email conflicts with an existing user.");
+            }
+
+            bootstrapAdmin.Email = user.Email;
+            bootstrapAdmin.NormalizedEmail = user.NormalizedEmail;
+            bootstrapAdmin.PasswordHash = user.PasswordHash;
+            bootstrapAdmin.UpdatedAt = now;
+            await dbContext.Set<UserSessionEntity>()
+                .Where(x => x.UserId == bootstrapAdmin.Id && x.RevokedAt == null)
+                .ExecuteUpdateAsync(
+                    updates => updates.SetProperty(x => x.RevokedAt, now),
+                    cancellationToken);
+            AddAudit(
+                bootstrapAdmin.Id,
+                "user",
+                bootstrapAdmin.Email,
+                "identity.bootstrap",
+                "synchronized",
+                requestContext,
+                now);
+            await dbContext.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return BootstrapStoreStatus.Updated;
+        }
+
+        if (bootstrapState is not null)
         {
             await transaction.CommitAsync(cancellationToken);
             return BootstrapStoreStatus.AlreadyDisabled;

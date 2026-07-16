@@ -7,7 +7,7 @@ public sealed class LocalAdminBootstrapHostedService(
     IConfiguration configuration,
     ILogger<LocalAdminBootstrapHostedService> logger) : IHostedService
 {
-    private const string PlaceholderPassword = "CHANGE_ME_ADMIN_PASSWORD";
+    private const string PlaceholderPassword = "CHANGE_ME_TO_A_LONG_RANDOM_ADMIN_PASSWORD";
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
@@ -44,6 +44,10 @@ public sealed class LocalAdminBootstrapHostedService(
         if (status == BootstrapStatus.Created)
         {
             logger.LogInformation("Local administrator bootstrap completed.");
+        }
+        else if (status == BootstrapStatus.Updated)
+        {
+            logger.LogInformation("Local administrator bootstrap credentials synchronized.");
         }
         else
         {

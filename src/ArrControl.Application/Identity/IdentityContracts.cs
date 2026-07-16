@@ -116,6 +116,7 @@ public sealed record LoginFailureCounts(int AccountFailures, int IpFailures);
 public enum BootstrapStoreStatus
 {
     Created,
+    Updated,
     AlreadyDisabled,
     ExistingUsersDisabled,
 }
@@ -268,5 +269,6 @@ public sealed record RefreshResult(RefreshStatus Status, IssuedSession? Session 
 public enum BootstrapStatus
 {
     Created,
+    Updated,
     AlreadyDisabled,
 }

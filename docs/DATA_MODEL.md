@@ -71,7 +71,7 @@ Forward-only EF Core migrations, tested from the oldest supported version. Start
 
 The initial migration creates the identity, connections, operations, outbox, and automation foundation. `audit_events` is partitioned by `occurred_at` with a default partition so inserts remain safe before rolling time partitions are introduced; audit updates are rejected while retention may delete expired rows.
 
-The local-authentication migration adds one-time bootstrap state and short-lived access-token data. An installation that already has any user receives the disabled-bootstrap sentinel during upgrade. Legacy session rows receive unique expired access hashes; non-32-byte refresh hashes are normalized and revoked, and duplicate active family rows are reduced before exact hash lengths and the single-active-family invariant are enforced.
+The local-authentication migration adds bootstrap state and short-lived access-token data. An installation that already has any user receives a disabled-bootstrap sentinel during upgrade. For a bootstrap-created administrator, configured bootstrap email/password values synchronize that same administrator at startup and revoke its sessions. Legacy session rows receive unique expired access hashes; non-32-byte refresh hashes are normalized and revoked, and duplicate active family rows are reduced before exact hash lengths and the single-active-family invariant are enforced.
 
 The OIDC migration marks existing sessions as `local`, constrains new sessions to `local|oidc`, and adds external-role provenance plus protected token-family logout context. It does not rewrite existing identities or role assignments.
 

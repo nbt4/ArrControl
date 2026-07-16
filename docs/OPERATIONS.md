@@ -42,7 +42,7 @@ The `data-protection-keys` volume is the only writable persistent application pa
 
 ## Local administrator bootstrap
 
-Run schema migrations before the first application start (the baseline Compose dependency does this automatically). Supply both bootstrap variables for exactly one app start, confirm the generic completion log entry, verify login over HTTPS, and then remove both variables from Compose and the process environment and delete the password from the secret store. The database bootstrap sentinel prevents a later restart or administrator deletion from re-enabling bootstrap. A partial configuration, the placeholder password, invalid local-auth limits, or an unavailable/missing schema causes startup to fail closed.
+ArrControl applies schema migrations before the first application start. Supply both bootstrap variables on every app start. They create the initial administrator and then synchronize that same bootstrap administrator's email and password on later starts, revoking its existing sessions. Treat the deployment variables as administrator-recovery secrets. A partial configuration, the placeholder password, an email conflict, invalid local-auth limits, or an unavailable/missing schema causes startup to fail closed.
 
 Monitor `identity.login` failures/rate limits and `identity.refresh_reuse` events. A refresh replay revokes its entire token family; repeated events can indicate a stolen cookie or a client retrying a consumed refresh after losing the successful response.
 

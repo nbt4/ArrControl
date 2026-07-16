@@ -185,7 +185,7 @@ public sealed class AuthPersistenceTests(AuthDatabaseFixture database) : IClassF
         var statuses = await Task.WhenAll(firstAttempt, secondAttempt);
 
         Assert.Single(statuses, x => x == BootstrapStoreStatus.Created);
-        Assert.Single(statuses, x => x == BootstrapStoreStatus.AlreadyDisabled);
+        Assert.Single(statuses, x => x == BootstrapStoreStatus.Updated);
 
         await using var verificationContext = new ArrControlDbContext(options);
         var user = Assert.Single(await verificationContext.Set<UserEntity>()
@@ -217,7 +217,7 @@ public sealed class AuthPersistenceTests(AuthDatabaseFixture database) : IClassF
         var finalAttemptStore = CreateStore(finalAttemptContext);
         Assert.True(await finalAttemptStore.IsBootstrapDisabledAsync(CancellationToken.None));
         Assert.Equal(
-            BootstrapStoreStatus.AlreadyDisabled,
+            BootstrapStoreStatus.Updated,
             await finalAttemptStore.BootstrapAsync(
                 BootstrapUser("third-admin@example.invalid"),
                 Request("bootstrap-final", "192.0.2.12"),

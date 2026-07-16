@@ -8,7 +8,7 @@ This guide covers installation ownership, identity, authorization, instances, li
 2. Generate the credential key with `umask 077; mkdir -p secrets; openssl rand -base64 32 > secrets/arrcontrol-master-key`. Keep it mode `0600`, outside source control and backups that contain only public configuration.
 3. Put a trusted HTTPS reverse proxy in front of ArrControl's HTTP port (default `8080`; configure `ARRCONTROL_HTTP_PORT` to change it). Browser login intentionally does not work over direct HTTP because session cookies are always Secure.
 4. Run `docker compose up --build`. ArrControl applies pending database migrations before it starts; confirm `/health/live` is live and `/health/ready` is healthy.
-5. Bootstrap once with a unique administrator email/password. Log in, confirm the Administrator role, then remove both bootstrap variables and delete the cleartext password from deployment configuration.
+5. Set a unique administrator email/password. ArrControl synchronizes that bootstrap administrator on every startup, so protect both deployment variables as administrator-recovery secrets. Log in and confirm the Administrator role.
 6. Take a first complete backup and perform an isolated restore test.
 
 Do not run an older app image against a database schema migrated by a newer image. Normal startup applies pending forward-only migrations before HTTP or background services start.

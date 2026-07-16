@@ -101,7 +101,7 @@ public sealed class LocalAuthenticationApiTests(AuthApiDatabaseFixture databaseF
     [Theory]
     [InlineData(AdminEmail, null, "requires both")]
     [InlineData(null, AdminPassword, "requires both")]
-    [InlineData(AdminEmail, "CHANGE_ME_ADMIN_PASSWORD", "placeholder")]
+    [InlineData(AdminEmail, "CHANGE_ME_TO_A_LONG_RANDOM_ADMIN_PASSWORD", "placeholder")]
     public async Task Unsafe_bootstrap_configuration_fails_startup_without_creating_a_user(
         string? email,
         string? password,
@@ -252,11 +252,18 @@ public sealed class LocalAuthenticationApiTests(AuthApiDatabaseFixture databaseF
     }
 
     [Fact]
-    public async Task Bootstrap_is_one_time_login_failures_are_generic_and_session_cookies_are_secure()
+    public async Task Bootstrap_variables_update_the_bootstrap_admin_and_revoke_sessions()
     {
         using var scenario = await CreateScenarioAsync();
-
-        await AssertBootstrapStateAsync(scenario.ConnectionString, AdminEmail, AdminPassword);
+        var initialCsrf = await GetCsrfAsync(scenario.Client);
+        using var initialLogin = await LoginAsync(
+            scenario.Client,
+            AdminEmail,
+            AdminPassword,
+            initialCsrf.Token,
+            initialCsrf.Token);
+        Assert.Equal(HttpStatusCode.OK, initialLogin.StatusCode);
+        var initialCookies = await ReadSessionCookiesAsync(initialLogin);
 
         using var secondFactory = new AuthApiFactory(
             scenario.ConnectionString,
@@ -265,17 +272,23 @@ public sealed class LocalAuthenticationApiTests(AuthApiDatabaseFixture databaseF
         using var secondClient = CreateHttpsClient(secondFactory);
         var csrf = await GetCsrfAsync(secondClient);
 
-        await AssertBootstrapStateAsync(scenario.ConnectionString, AdminEmail, AdminPassword);
+        await AssertBootstrapStateAsync(
+            scenario.ConnectionString,
+            "second-admin@example.invalid",
+            "different bootstrap password");
+
+        using var revokedSession = await GetInstancesAsync(secondClient, initialCookies.Access);
+        Assert.Equal(HttpStatusCode.Unauthorized, revokedSession.StatusCode);
 
         using var wrongPassword = await LoginAsync(
             secondClient,
-            AdminEmail,
+            "second-admin@example.invalid",
             "incorrect password",
             csrf.Token,
             csrf.Token);
         using var unknownAccount = await LoginAsync(
             secondClient,
-            "second-admin@example.invalid",
+            AdminEmail,
             "incorrect password",
             csrf.Token,
             csrf.Token);
@@ -294,8 +307,8 @@ public sealed class LocalAuthenticationApiTests(AuthApiDatabaseFixture databaseF
 
         using var login = await LoginAsync(
             secondClient,
-            AdminEmail,
-            AdminPassword,
+            "second-admin@example.invalid",
+            "different bootstrap password",
             csrf.Token,
             csrf.Token);
         Assert.Equal(HttpStatusCode.OK, login.StatusCode);
