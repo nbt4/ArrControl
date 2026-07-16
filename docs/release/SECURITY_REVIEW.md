@@ -7,7 +7,7 @@ This record must be completed by a reviewer who did not implement the reviewed s
 - Reviewer: Project maintainer
 - Organization/relationship: Project owner; independent of the implementation agent
 - Review dates: 2026-07-16
-- Commit/digest reviewed: `bddb33e` on `agent/publish-backlog`, plus the reviewed release-candidate evidence in this record
+- Commit/digest reviewed: `41cd4b0` on `agent/publish-backlog`, plus the reviewed release-candidate evidence in this record
 - Scope: identity/session/OIDC, RBAC/CSRF, SSRF/egress, credentials/keys, provider/notification boundaries, database/backup, browser headers, CI/release supply chain.
 - Methods and tools: Threat-model/control review, implementation/evidence review, and the automated CodeQL, Trivy, and passive ZAP evidence referenced below.
 - Findings and severities: No unresolved critical or high finding accepted for this candidate.
@@ -28,7 +28,7 @@ Use the following evidence when filling out the review:
 - Release-candidate compatibility and scope boundaries: `docs/release/V1_COMPATIBILITY_REPORT.md`
 - Release gate implementation: `.github/workflows/release.yml`
 - Security scan automation: `.github/workflows/security-review.yml`
-- Current release commit reviewed: `bddb33e` on `agent/publish-backlog`
+- Current release commit reviewed: `41cd4b0` on `agent/publish-backlog`
 
 Recommended review scope:
 
