@@ -107,6 +107,7 @@ public sealed class EfJobSchedulerStore(
               AND completed_at IS NULL
             """, cancellationToken);
 
+        var candidateLimit = checked(maximumCount * 4);
         var candidates = await dbContext.Set<JobRunEntity>()
             .FromSqlInterpolated($$"""
                 SELECT job.*
@@ -122,7 +123,7 @@ public sealed class EfJobSchedulerStore(
                   )
                 ORDER BY job.available_at, job.scheduled_for, job.id
                 FOR UPDATE OF job SKIP LOCKED
-                LIMIT {{maximumCount}}
+                LIMIT {{candidateLimit}}
                 """)
             .ToArrayAsync(cancellationToken);
         if (candidates.Length == 0)
@@ -131,14 +132,22 @@ public sealed class EfJobSchedulerStore(
             return [];
         }
 
-        var scheduleIds = candidates.Select(value => value.ScheduleId).Distinct().ToArray();
+        var selected = candidates
+            .GroupBy(value => value.ScheduleId)
+            .Select(group => group.First())
+            .Concat(candidates
+                .GroupBy(value => value.ScheduleId)
+                .SelectMany(group => group.Skip(1)))
+            .Take(maximumCount)
+            .ToArray();
+        var scheduleIds = selected.Select(value => value.ScheduleId).Distinct().ToArray();
         var schedules = await dbContext.Set<ScheduleEntity>()
             .AsNoTracking()
             .Where(schedule => scheduleIds.Contains(schedule.Id))
             .ToDictionaryAsync(schedule => schedule.Id, cancellationToken);
         var leaseUntil = now + leaseDuration;
-        var claimed = new List<ClaimedJob>(candidates.Length);
-        foreach (var candidate in candidates)
+        var claimed = new List<ClaimedJob>(selected.Length);
+        foreach (var candidate in selected)
         {
             var token = Guid.CreateVersion7();
             candidate.State = JobRunStates.Running;
