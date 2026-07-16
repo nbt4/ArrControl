@@ -4,7 +4,7 @@ export const en = {
     skipToContent: 'Skip to main content',
     navigation: {
       label: 'Primary navigation', overview: 'Overview', library: 'Library', missing: 'Missing',
-      queue: 'Queue', health: 'Health', audit: 'Audit',
+      queue: 'Queue', history: 'History', health: 'Health', audit: 'Audit', settings: 'Settings',
     },
     liveApi: 'Live API data',
   },
@@ -38,6 +38,30 @@ export const en = {
     emptyBody: 'Use the instance API or an administrator account to add the first provider.',
     enabled: 'Enabled', disabled: 'Disabled', keyConfigured: 'Key configured', keyMissing: 'Key missing',
     tlsVerified: 'TLS verified', tlsBypass: 'TLS bypass',
+    addEyebrow: 'CONNECTIONS', addTitle: 'Add service',
+    addBody: 'Provider credentials are encrypted and never returned to the browser after saving.',
+    name: 'Name', kind: 'Provider', baseUrl: 'Base URL', apiKey: 'API key (optional)',
+    allowPrivateNetwork: 'Allow private-network target', add: 'Add service',
+    addFailed: 'The service could not be added. Check its URL and your permissions.',
+    probe: 'Test connection', probeConnected: 'Connected', probeFailed: 'Connection failed ({{outcome}})',
+    edit: 'Edit', save: 'Save service', verifyTls: 'Verify TLS certificate',
+    tlsWarning: 'TLS verification is disabled for this service. Use this only for a trusted self-signed local certificate.',
+    apiKeyReplace: 'Replace API key (leave blank to keep current key)',
+    deleteTitle: 'Remove service', deleteBody: 'Type {{name}} to permanently remove this service and its stored credentials.',
+    deleteConfirm: 'Service name', delete: 'Remove service',
+  },
+  missing: {
+    eyebrow: 'MISSING', title: 'Missing media', search: 'Filter titles', failed: 'Missing media could not be loaded.',
+    emptyTitle: 'No missing media', emptyBody: 'A completed provider synchronization has not reported any missing media.',
+    fresh: 'Fresh', stale: 'Stale',
+  },
+  queue: {
+    eyebrow: 'QUEUE', title: 'Current queue', failed: 'Queue data could not be loaded.', unknownProtocol: 'Unknown protocol',
+    emptyTitle: 'Queue is empty', emptyBody: 'No visible provider or download-client queue entries are currently projected.', fresh: 'Fresh', stale: 'Stale',
+  },
+  history: {
+    eyebrow: 'HISTORY', title: 'Recent activity', failed: 'History could not be loaded.',
+    emptyTitle: 'No recent activity', emptyBody: 'No visible provider activity has been projected yet.', fresh: 'Fresh', stale: 'Stale',
   },
   import: {
     guidance: {

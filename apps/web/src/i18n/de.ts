@@ -4,7 +4,7 @@ export const de = {
     skipToContent: 'Zum Hauptinhalt springen',
     navigation: {
       label: 'Hauptnavigation', overview: 'Übersicht', library: 'Bibliothek', missing: 'Fehlend',
-      queue: 'Warteschlange', health: 'Zustand', audit: 'Audit',
+      queue: 'Warteschlange', history: 'Verlauf', health: 'Zustand', audit: 'Audit', settings: 'Einstellungen',
     },
     liveApi: 'Live-API-Daten',
   },
@@ -38,6 +38,30 @@ export const de = {
     emptyBody: 'Die Instanz-API oder ein Administratorkonto verwenden, um den ersten Anbieter hinzuzufügen.',
     enabled: 'Aktiviert', disabled: 'Deaktiviert', keyConfigured: 'Schlüssel eingerichtet', keyMissing: 'Schlüssel fehlt',
     tlsVerified: 'TLS geprüft', tlsBypass: 'TLS umgangen',
+    addEyebrow: 'VERBINDUNGEN', addTitle: 'Dienst hinzufügen',
+    addBody: 'Zugangsdaten werden verschlüsselt gespeichert und nach dem Speichern nie an den Browser zurückgegeben.',
+    name: 'Name', kind: 'Anbieter', baseUrl: 'Basis-URL', apiKey: 'API-Schlüssel (optional)',
+    allowPrivateNetwork: 'Privates Netzwerkziel erlauben', add: 'Dienst hinzufügen',
+    addFailed: 'Der Dienst konnte nicht hinzugefügt werden. URL und Berechtigungen prüfen.',
+    probe: 'Verbindung testen', probeConnected: 'Verbunden', probeFailed: 'Verbindung fehlgeschlagen ({{outcome}})',
+    edit: 'Bearbeiten', save: 'Dienst speichern', verifyTls: 'TLS-Zertifikat prüfen',
+    tlsWarning: 'Die TLS-Prüfung ist für diesen Dienst deaktiviert. Das nur bei einem vertrauenswürdigen selbstsignierten lokalen Zertifikat verwenden.',
+    apiKeyReplace: 'API-Schlüssel ersetzen (leer lassen, um den aktuellen Schlüssel zu behalten)',
+    deleteTitle: 'Dienst entfernen', deleteBody: 'Zum endgültigen Löschen dieses Diensts und seiner gespeicherten Zugangsdaten {{name}} eingeben.',
+    deleteConfirm: 'Dienstname', delete: 'Dienst entfernen',
+  },
+  missing: {
+    eyebrow: 'FEHLEND', title: 'Fehlende Medien', search: 'Titel filtern', failed: 'Fehlende Medien konnten nicht geladen werden.',
+    emptyTitle: 'Keine fehlenden Medien', emptyBody: 'Eine vollständige Anbieter-Synchronisierung hat keine fehlenden Medien gemeldet.',
+    fresh: 'Aktuell', stale: 'Veraltet',
+  },
+  queue: {
+    eyebrow: 'WARTESCHLANGE', title: 'Aktuelle Warteschlange', failed: 'Warteschlangendaten konnten nicht geladen werden.', unknownProtocol: 'Unbekanntes Protokoll',
+    emptyTitle: 'Warteschlange ist leer', emptyBody: 'Derzeit sind keine sichtbaren Anbieter- oder Download-Client-Einträge projiziert.', fresh: 'Aktuell', stale: 'Veraltet',
+  },
+  history: {
+    eyebrow: 'VERLAUF', title: 'Letzte Aktivitäten', failed: 'Verlauf konnte nicht geladen werden.',
+    emptyTitle: 'Keine aktuellen Aktivitäten', emptyBody: 'Es wurden noch keine sichtbaren Anbieter-Aktivitäten projiziert.', fresh: 'Aktuell', stale: 'Veraltet',
   },
   import: {
     guidance: {

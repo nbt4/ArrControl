@@ -15,6 +15,23 @@ The direct HTTP port is suitable for status checks but deliberately cannot set t
 
 For local development, use .NET 9 SDK and Node 22/pnpm 10. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
+## Add to an existing Arr stack
+
+The published `nobentie/arrcontrol` image contains the browser UI, API, and background workers. A single PostgreSQL container is the only required companion; Authentik, Redis, and message brokers are not required.
+
+1. Copy [deploy/compose.arr-stack.yaml](deploy/compose.arr-stack.yaml) next to your stack and copy [deploy/arr-stack.env.example](deploy/arr-stack.env.example) to `.env`.
+2. Generate the write-only credential key once: `mkdir -p /opt/docker/arrcontrol/secrets && openssl rand -base64 32 > /opt/docker/arrcontrol/secrets/master-key && chmod 600 /opt/docker/arrcontrol/secrets/master-key`.
+3. Adjust the data path, strong database/admin passwords, and public HTTPS URL. The fragment attaches ArrControl to existing external Docker networks named `proxy` and `starr`; rename those entries if your stack uses different names.
+4. Start the database, apply migrations with the same application image, then start both services:
+
+   ```text
+   docker compose -f compose.arr-stack.yaml up -d arrcontrol-db
+   docker compose -f compose.arr-stack.yaml run --rm --no-deps arrcontrol database migrate
+   docker compose -f compose.arr-stack.yaml up -d
+   ```
+
+Your reverse proxy should forward HTTPS traffic to `arrcontrol:8080` on the `proxy` network. Browser login intentionally does not work over direct HTTP. For Arr containers using `network_mode: service:gluetun`, add their Gluetun service name and published internal port (for example `http://arr_vpn:8989` for Sonarr), then explicitly permit private-network access in ArrControl.
+
 ## Documentation map
 
 - [Documentation index](docs/README.md)

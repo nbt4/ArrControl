@@ -117,6 +117,25 @@ h3 { margin: 0; }
 .state-card.error { border-color: #61302d; color: #ffaaa4; }
 .notice { display: flex; gap: 13px; align-items: flex-start; padding: 24px 2px; color: var(--muted); }
 .notice h3 { color: #e8edf2; }
+.instance-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--line); }
+.instance-form > div, .instance-form > button, .instance-form > .form-error { grid-column: 1 / -1; }
+.instance-form label { display: grid; gap: 6px; color: #c6ced5; font-size: 13px; }
+.instance-form input, .instance-form select { width: 100%; border: 1px solid #35414a; background: #0b1014; color: #f2f6f8; border-radius: 8px; padding: 11px 12px; }
+.instance-form .checkbox-label { display: flex; align-items: center; gap: 9px; }
+.instance-form .checkbox-label input { width: auto; }
+.data-list { display: grid; }
+.data-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 17px 2px; border-bottom: 1px solid var(--line); }
+.data-row:last-child { border-bottom: 0; }
+.data-row p { margin: 6px 0 0; color: var(--muted); font-size: 13px; }
+.instance-edit { grid-column: 2 / -1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 12px 0 2px; }
+.instance-edit label { display: grid; gap: 6px; color: #c6ced5; font-size: 13px; }
+.instance-edit input { width: 100%; border: 1px solid #35414a; background: #0b1014; color: #f2f6f8; border-radius: 8px; padding: 10px 11px; }
+.instance-edit .checkbox-label { display: flex; align-items: center; gap: 9px; }
+.instance-edit .checkbox-label input { width: auto; }
+.instance-edit .form-error, .instance-edit > button, .instance-delete { grid-column: 1 / -1; }
+.instance-delete { display: grid; gap: 8px; padding: 14px; border: 1px solid #61302d; border-radius: 9px; }
+.instance-delete p { margin: 0; color: var(--muted); }
+.instance-delete button { justify-self: start; border-color: #8d3c37; background: #3a1e1c; }
 .spin { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
@@ -140,6 +159,7 @@ h3 { margin: 0; }
   .preferences button { grid-column: 1 / -1; }
   .preferences select { max-width: none; width: 100%; }
   .login-panel { grid-template-columns: 1fr; gap: 20px; }
+  .instance-form { grid-template-columns: 1fr; }
   .incident-heading { display: grid; }
   .incident-actions { justify-content: start; }
 }

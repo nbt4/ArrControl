@@ -15,7 +15,8 @@ RUN dotnet publish src/ArrControl.Api/ArrControl.Api.csproj -c Release -o /out -
 
 FROM mcr.microsoft.com/dotnet/aspnet:9.0-alpine
 WORKDIR /app
-RUN addgroup -S arrcontrol \
+RUN apk add --no-cache tzdata \
+    && addgroup -S arrcontrol \
     && adduser -S arrcontrol -G arrcontrol \
     && mkdir -p /var/lib/arrcontrol/data-protection-keys \
     && chown -R arrcontrol:arrcontrol /var/lib/arrcontrol \

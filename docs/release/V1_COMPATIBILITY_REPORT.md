@@ -12,7 +12,7 @@ Status: technically ready for a tagged release after independent human security 
 | Browser | React 19, Chromium accessibility baseline, responsive English/German UI | lint, 4 component/catalog tests, production build, 2 keyboard/axe E2E scenarios |
 | Database | PostgreSQL 17; forward EF migrations; 256 MiB shared memory in Compose | model/migration drift check; isolated dump/restore/initial-schema upgrade; idempotent migration |
 | Capacity | 20 instances, 100,000 catalog rows, 10,000-target operation, 250 reconnect burst | 259.1 ms cached projection p95; 6.98 s bulk snapshot; 351.3 ms reconnect p95 on documented host |
-| Architectures | OCI `linux/amd64` and `linux/arm64` | tag workflow build matrix and post-push manifest assertion; publication evidence is pending |
+| Architectures | OCI `linux/amd64` and `linux/arm64` | tag workflow build matrix, plus a local OCI multi-arch build in this workspace that verified both manifests; publication evidence is pending |
 | Supply chain | CycloneDX SBOM, BuildKit max provenance, Trivy gate, keyless Cosign digest signature | workflow is commit-pinned and verifies the exact tag-workflow identity; published digest/signature pending |
 
 ## Provider contract evidence
@@ -49,6 +49,7 @@ Unknown fields/statuses fail soft where safe; an unknown product or unevidenced 
 - Local bootstrap/session rotation/replay controls, Authentik-shaped OIDC + optional pinned real-Authentik suite, current-database RBAC scopes, encrypted write-only credential store, SSRF/DNS-rebinding defenses, durable scheduler, projections, operations, outbox/SSE, audit/diagnostics, and provider boundaries have focused unit/integration suites described in `docs/TESTING.md`.
 - OpenAPI/generated-client drift, migration drift, frontend production build, security headers, and the data lifecycle are automated gates.
 - OWASP ZAP local passive baseline: 0 failures; the same-origin resource-policy warning found during review was fixed and regression-tested. CodeQL/Trivy workflows remain the authoritative CI scans.
+- Local OCI release build in this workspace produced a multi-architecture archive whose manifest list contains `linux/amd64` and `linux/arm64`. This confirms the release Dockerfile and build pipeline still assemble both target architectures locally before any tag/push/publish step.
 - WCAG baseline: zero axe violations across the two delivered anonymous/authenticated scenarios; manual assistive-technology RC pass remains required by `ACCESSIBILITY.md`.
 - Threat model is complete. `docs/release/SECURITY_REVIEW.md` deliberately remains pending until a reviewer independent of implementation signs off.
 
@@ -62,4 +63,4 @@ Unknown fields/statuses fail soft where safe; an unknown product or unevidenced 
 
 ## Release decision
 
-The candidate may be tagged `v1.0.0` only after the independent human security record says `Status: approved`, the maintainer approves publication, the source tree is committed/reviewed, and required CI is green. The tag workflow then publishes the multi-architecture digest, scans it, signs it with GitHub OIDC, verifies identity, asserts both architectures, and uploads immutable evidence. Until that happens, do not call the v1.0 image published or signed.
+The candidate may be tagged `v1.0.0` only after the independent human security record says `Status: approved`, the maintainer approves publication, the source tree is committed/reviewed, and required CI is green. The tag workflow then publishes the multi-architecture digest, scans it, signs it with GitHub OIDC, verifies identity, asserts both architectures, and uploads immutable evidence. The local workspace already confirms the release container can be built for both `linux/amd64` and `linux/arm64`; until publication happens, do not call the v1.0 image published or signed.

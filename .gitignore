@@ -14,3 +14,4 @@ secrets/
 *.user
 *.suo
 *.log
+Caddyfile.local

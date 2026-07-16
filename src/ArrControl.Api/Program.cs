@@ -125,6 +125,8 @@ app.UseExceptionHandler();
 app.UseStatusCodePages();
 app.MapOpenApi("/api/openapi/{documentName}.json").AllowAnonymous();
 app.UseRateLimiter();
+app.UseDefaultFiles();
+app.UseStaticFiles();
 app.Use(async (context, next) =>
 {
     if (HttpMethods.IsPost(context.Request.Method)
@@ -154,8 +156,6 @@ app.MapLiveEvents();
 app.MapAudit();
 app.MapHealthChecks("/health/live", new() { Predicate = _ => false }).AllowAnonymous();
 app.MapHealthChecks("/health/ready").AllowAnonymous();
-app.UseDefaultFiles();
-app.UseStaticFiles();
 app.MapFallbackToFile("index.html").AllowAnonymous();
 app.Run();
 

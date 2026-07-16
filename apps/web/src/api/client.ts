@@ -6,9 +6,13 @@ export const api = createClient<paths>({ baseUrl: '/api/v1', credentials: 'inclu
 export type SystemStatus = components['schemas']['SystemStatus'];
 export type CurrentAuthorization = components['schemas']['CurrentAuthorization'];
 export type InstanceSummary = components['schemas']['InstanceSummary'];
+export type InstanceKind = components['schemas']['InstanceKind'];
 export type UserPreferences = components['schemas']['UserPreferences'];
 export type HealthIncident = components['schemas']['HealthIncident'];
 export type AuditEvent = components['schemas']['AuditEvent'];
+export type MissingPage = components['schemas']['MissingPage'];
+export type QueueItem = components['schemas']['AggregatedQueueItem'];
+export type HistoryItem = components['schemas']['AggregatedHistoryItem'];
 
 export interface DashboardSnapshot {
   status: SystemStatus;
@@ -138,5 +142,84 @@ export async function updatePreferences(locale: 'en' | 'de', timeZone: string): 
     body: { locale, timeZone },
   });
   if (!result.data) throw new Error('preference_update_failed');
+  return result.data;
+}
+
+export async function createInstance(request: {
+  name: string;
+  kind: InstanceKind;
+  baseUrl: string;
+  allowPrivateNetworkAccess: boolean;
+  tlsVerificationEnabled: boolean;
+}): Promise<components['schemas']['InstanceDetails']> {
+  const token = await csrfToken();
+  const result = await api.POST('/instances', {
+    params: { header: { 'X-CSRF-Token': token } },
+    body: { ...request, enabled: true, instanceGroupId: null },
+  });
+  if (!result.data) throw new Error('instance_create_failed');
+  return result.data;
+}
+
+export async function updateInstance(request: {
+  id: string;
+  name: string;
+  kind: InstanceKind;
+  baseUrl: string;
+  enabled: boolean;
+  instanceGroupId: string | null;
+  allowPrivateNetworkAccess: boolean;
+  tlsVerificationEnabled: boolean;
+}): Promise<void> {
+  const token = await csrfToken();
+  const { id, ...body } = request;
+  const result = await api.PUT('/instances/{instanceId}', {
+    params: { path: { instanceId: id }, header: { 'X-CSRF-Token': token } },
+    body,
+  });
+  if (!result.data) throw new Error('instance_update_failed');
+}
+
+export async function deleteInstance(instanceId: string): Promise<void> {
+  const token = await csrfToken();
+  const result = await api.DELETE('/instances/{instanceId}', {
+    params: { path: { instanceId }, header: { 'X-CSRF-Token': token } },
+  });
+  if (!result.response.ok) throw new Error('instance_delete_failed');
+}
+
+export async function putApiKey(instanceId: string, secret: string): Promise<void> {
+  const token = await csrfToken();
+  const result = await api.PUT('/instances/{instanceId}/credentials/{purpose}', {
+    params: { path: { instanceId, purpose: 'api-key' }, header: { 'X-CSRF-Token': token } },
+    body: { secret },
+  });
+  if (!result.data) throw new Error('credential_save_failed');
+}
+
+export async function probeInstance(instanceId: string): Promise<components['schemas']['ConnectionProbe']> {
+  const token = await csrfToken();
+  const result = await api.POST('/instances/{instanceId}/probe', {
+    params: { path: { instanceId }, header: { 'X-CSRF-Token': token } },
+  });
+  if (!result.data) throw new Error('instance_probe_failed');
+  return result.data;
+}
+
+export async function listMissing(search?: string): Promise<MissingPage> {
+  const result = await api.GET('/missing', { params: { query: { limit: 50, ...(search ? { search } : {}) } } });
+  if (!result.data) throw new Error('missing_unavailable');
+  return result.data;
+}
+
+export async function listQueue(): Promise<readonly QueueItem[]> {
+  const result = await api.GET('/queue');
+  if (!result.data) throw new Error('queue_unavailable');
+  return result.data;
+}
+
+export async function listHistory(): Promise<readonly HistoryItem[]> {
+  const result = await api.GET('/history', { params: { query: { limit: 100 } } });
+  if (!result.data) throw new Error('history_unavailable');
   return result.data;
 }

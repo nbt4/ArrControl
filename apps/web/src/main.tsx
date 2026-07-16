@@ -5,9 +5,9 @@ import {
   LockKeyhole, LogIn, LogOut, RefreshCw, Server, ShieldCheck, ShieldOff,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import type { AuditEvent, DashboardSnapshot, HealthIncident, InstanceSummary } from './api/client';
+import type { AuditEvent, DashboardSnapshot, HealthIncident, HistoryItem, InstanceKind, InstanceSummary, MissingPage, QueueItem } from './api/client';
 import {
-  exportDiagnostics, loadDashboard, login, logout, setHealthAcknowledgement, setHealthSnooze,
+  createInstance, deleteInstance, exportDiagnostics, listHistory, listMissing, listQueue, loadDashboard, login, logout, probeInstance, putApiKey, setHealthAcknowledgement, setHealthSnooze, updateInstance,
   updatePreferences,
 } from './api/client';
 import { buildDashboardMetrics } from './dashboard';
@@ -22,6 +22,13 @@ type ViewState =
   | { kind: 'ready'; snapshot: DashboardSnapshot }
   | { kind: 'error' };
 
+type Page = 'overview' | 'missing' | 'queue' | 'history' | 'health' | 'audit' | 'settings';
+
+function pageFromHash(): Page {
+  const value = window.location.hash.slice(1);
+  return ['missing', 'queue', 'history', 'health', 'audit', 'settings'].includes(value) ? value as Page : 'overview';
+}
+
 const metricIcons = [Activity, Server, KeyRound, ShieldCheck] as const;
 
 function readStoredTimeZone(): string {
@@ -33,6 +40,7 @@ function App() {
   const { t } = useTranslation();
   const [view, setView] = useState<ViewState>({ kind: 'loading' });
   const [refreshKey, setRefreshKey] = useState(0);
+  const [page, setPage] = useState<Page>(pageFromHash);
   const [localTimeZone, setLocalTimeZone] = useState(readStoredTimeZone);
   const refresh = useCallback(() => {
     setView({ kind: 'loading' });
@@ -57,6 +65,12 @@ function App() {
       });
     return () => controller.abort();
   }, [refreshKey]);
+
+  useEffect(() => {
+    const onHashChange = () => setPage(pageFromHash());
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
 
   const liveUserId = view.kind === 'ready' ? view.snapshot.authorization?.userId : null;
   const liveCursor = view.kind === 'ready' ? view.snapshot.liveCursor : null;
@@ -98,12 +112,13 @@ function App() {
       <aside>
         <div className="brand"><span>AC</span><b>{t('app.brand')}</b></div>
         <nav aria-label={t('app.navigation.label')}>
-          <a className="active" href="#overview">{t('app.navigation.overview')}</a>
-          <span aria-disabled="true">{t('app.navigation.library')}</span>
-          <span aria-disabled="true">{t('app.navigation.missing')}</span>
-          <span aria-disabled="true">{t('app.navigation.queue')}</span>
-          <a href="#health">{t('app.navigation.health')}</a>
-          <a href="#audit">{t('app.navigation.audit')}</a>
+          <a className={page === 'overview' ? 'active' : ''} href="#overview">{t('app.navigation.overview')}</a>
+          <a className={page === 'missing' ? 'active' : ''} href="#missing">{t('app.navigation.missing')}</a>
+          <a className={page === 'queue' ? 'active' : ''} href="#queue">{t('app.navigation.queue')}</a>
+          <a className={page === 'history' ? 'active' : ''} href="#history">{t('app.navigation.history')}</a>
+          <a className={page === 'health' ? 'active' : ''} href="#health">{t('app.navigation.health')}</a>
+          <a className={page === 'audit' ? 'active' : ''} href="#audit">{t('app.navigation.audit')}</a>
+          <a className={page === 'settings' ? 'active' : ''} href="#settings">{t('app.navigation.settings')}</a>
         </nav>
         <div className="api-badge"><Database size={16} />{t('app.liveApi')}</div>
       </aside>
@@ -126,11 +141,29 @@ function App() {
         </header>
         {view.kind === 'loading' && <LoadingState />}
         {view.kind === 'error' && <ErrorState retry={refresh} />}
-        {view.kind === 'ready' && <Dashboard snapshot={view.snapshot} refresh={refresh} timeZone={localTimeZone} />}
+        {view.kind === 'ready' && <PageContent page={page} refresh={refresh} snapshot={view.snapshot} timeZone={localTimeZone} />}
       </main>
       </div>
     </>
   );
+}
+
+function PageContent({ page, refresh, snapshot, timeZone }: {
+  page: Page; refresh: () => void; snapshot: DashboardSnapshot; timeZone: string;
+}) {
+  if (page === 'missing') return <MissingScreen authorized={snapshot.authorization !== null} />;
+  if (page === 'queue') return <QueueScreen authorized={snapshot.authorization !== null} />;
+  if (page === 'history') return <HistoryScreen authorized={snapshot.authorization !== null} timeZone={timeZone} />;
+  if (page === 'health') return snapshot.authorization && snapshot.incidents
+    ? <HealthPanel canManage={snapshot.authorization.permissions.some((grant) => grant.code === 'tasks.execute')} incidents={snapshot.incidents} onChanged={refresh} timeZone={timeZone} />
+    : <LoginPanel onSuccess={refresh} />;
+  if (page === 'audit') return snapshot.authorization && snapshot.audit
+    ? <AuditPanel events={snapshot.audit} timeZone={timeZone} />
+    : <LoginPanel onSuccess={refresh} />;
+  if (page === 'settings') return snapshot.authorization
+    ? <AuthenticatedPanel canManage={snapshot.authorization.permissions.some((grant) => grant.code === 'instances.manage')} email={snapshot.authorization.email} instances={snapshot.instances} onChanged={refresh} onLogout={refresh} />
+    : <LoginPanel onSuccess={refresh} />;
+  return <Dashboard snapshot={snapshot} refresh={refresh} timeZone={timeZone} />;
 }
 
 function PreferenceControls({ locale, timeZone, onSave }: {
@@ -170,6 +203,46 @@ function PreferenceControls({ locale, timeZone, onSave }: {
   );
 }
 
+function MissingScreen({ authorized }: { authorized: boolean }) {
+  const { t } = useTranslation();
+  const [search, setSearch] = useState('');
+  const [data, setData] = useState<MissingPage | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    if (!authorized) return;
+    const controller = new AbortController();
+    setFailed(false);
+    listMissing(search).then(setData).catch(() => { if (!controller.signal.aborted) setFailed(true); });
+    return () => controller.abort();
+  }, [authorized, search]);
+  if (!authorized) return <LoginPanel onSuccess={() => window.location.reload()} />;
+  return <section className="workspace" id="missing"><div className="panel-heading"><div><p className="eyebrow">{t('missing.eyebrow')}</p><h2>{t('missing.title')}</h2></div><input aria-label={t('missing.search')} onChange={(event) => setSearch(event.target.value)} placeholder={t('missing.search')} value={search} /></div>
+    {failed ? <p className="form-error">{t('missing.failed')}</p> : data === null ? <LoadingState /> : data.items.length === 0 ? <Notice icon={CheckCircle2} title={t('missing.emptyTitle')}>{t('missing.emptyBody')}</Notice> : <div className="data-list">{data.items.map((item) => <article className="data-row" key={item.id}><div><strong>{item.title}</strong><p>{item.instanceName} · {item.kind} · {item.reason}</p></div><div className="service-flags"><StatusPill good={!item.stale} label={item.stale ? t('missing.stale') : t('missing.fresh')} /></div></article>)}</div>}
+  </section>;
+}
+
+function QueueScreen({ authorized }: { authorized: boolean }) {
+  const { t } = useTranslation();
+  const [items, setItems] = useState<readonly QueueItem[] | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => { if (!authorized) return; listQueue().then(setItems).catch(() => setFailed(true)); }, [authorized]);
+  if (!authorized) return <LoginPanel onSuccess={() => window.location.reload()} />;
+  return <section className="workspace" id="queue"><div className="panel-heading"><div><p className="eyebrow">{t('queue.eyebrow')}</p><h2>{t('queue.title')}</h2></div></div>
+    {failed ? <p className="form-error">{t('queue.failed')}</p> : items === null ? <LoadingState /> : items.length === 0 ? <Notice icon={CheckCircle2} title={t('queue.emptyTitle')}>{t('queue.emptyBody')}</Notice> : <div className="data-list">{items.map((item) => <article className="data-row" key={`${item.instanceId}:${item.providerKey}`}><div><strong>{item.title}</strong><p>{item.instanceName} · {item.status} · {item.protocol ?? t('queue.unknownProtocol')}</p></div><div className="service-flags"><StatusPill good={!item.stale} label={item.stale ? t('queue.stale') : t('queue.fresh')} /></div></article>)}</div>}
+  </section>;
+}
+
+function HistoryScreen({ authorized, timeZone }: { authorized: boolean; timeZone: string }) {
+  const { t, i18n: translation } = useTranslation();
+  const [items, setItems] = useState<readonly HistoryItem[] | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => { if (!authorized) return; listHistory().then(setItems).catch(() => setFailed(true)); }, [authorized]);
+  if (!authorized) return <LoginPanel onSuccess={() => window.location.reload()} />;
+  return <section className="workspace" id="history"><div className="panel-heading"><div><p className="eyebrow">{t('history.eyebrow')}</p><h2>{t('history.title')}</h2></div></div>
+    {failed ? <p className="form-error">{t('history.failed')}</p> : items === null ? <LoadingState /> : items.length === 0 ? <Notice icon={CheckCircle2} title={t('history.emptyTitle')}>{t('history.emptyBody')}</Notice> : <div className="data-list">{items.map((item) => <article className="data-row" key={`${item.instanceId}:${item.providerKey}:${item.eventAt}`}><div><strong>{item.title}</strong><p>{item.instanceName} · {item.eventType} · {formatDateTime(item.eventAt, translation.resolvedLanguage ?? 'en', timeZone)}</p></div><div className="service-flags"><StatusPill good={!item.stale} label={item.stale ? t('history.stale') : t('history.fresh')} /></div></article>)}</div>}
+  </section>;
+}
+
 function Dashboard({ snapshot, refresh, timeZone }: {
   snapshot: DashboardSnapshot; refresh: () => void; timeZone: string;
 }) {
@@ -191,7 +264,13 @@ function Dashboard({ snapshot, refresh, timeZone }: {
       </section>
       {snapshot.authorization === null
         ? <LoginPanel onSuccess={refresh} />
-        : <AuthenticatedPanel email={snapshot.authorization.email} instances={snapshot.instances} onLogout={refresh} />}
+        : <AuthenticatedPanel
+            canManage={snapshot.authorization.permissions.some((grant) => grant.code === 'instances.manage')}
+            email={snapshot.authorization.email}
+            instances={snapshot.instances}
+            onChanged={refresh}
+            onLogout={refresh}
+          />}
       {snapshot.authorization !== null && snapshot.incidents !== null && (
         <HealthPanel
           canManage={snapshot.authorization.permissions.some((grant) => grant.code === 'tasks.execute')}
@@ -319,8 +398,9 @@ function HealthPanel({ incidents, canManage, onChanged, timeZone }: {
   );
 }
 
-function AuthenticatedPanel({ email, instances, onLogout }: {
-  email: string; instances: readonly InstanceSummary[] | null; onLogout: () => void;
+function AuthenticatedPanel({ canManage, email, instances, onChanged, onLogout }: {
+  canManage: boolean; email: string; instances: readonly InstanceSummary[] | null;
+  onChanged: () => void; onLogout: () => void;
 }) {
   const { t } = useTranslation();
   const [busy, setBusy] = useState(false);
@@ -340,27 +420,109 @@ function AuthenticatedPanel({ email, instances, onLogout }: {
         ? <Notice icon={LockKeyhole} title={t('instance.accessMissingTitle')}>{t('instance.accessMissingBody')}</Notice>
         : instances.length === 0
           ? <Notice icon={Server} title={t('instance.emptyTitle')}>{t('instance.emptyBody')}</Notice>
-          : <InstanceList instances={instances} />}
+          : <InstanceList canManage={canManage} instances={instances} onChanged={onChanged} />}
+      {canManage && <CreateInstanceForm onCreated={onChanged} />}
     </section>
   );
 }
 
-function InstanceList({ instances }: { instances: readonly InstanceSummary[] }) {
+const instanceKinds: readonly InstanceKind[] = [
+  'sonarr', 'radarr', 'lidarr', 'readarr', 'whisparr', 'prowlarr', 'bazarr', 'sabnzbd', 'nzbget',
+  'qbittorrent', 'transmission', 'deluge', 'plex', 'jellyfin', 'emby', 'overseerr', 'jellyseerr', 'ombi',
+];
+
+function CreateInstanceForm({ onCreated }: { onCreated: () => void }) {
+  const { t } = useTranslation();
+  const [name, setName] = useState('');
+  const [kind, setKind] = useState<InstanceKind>('sonarr');
+  const [baseUrl, setBaseUrl] = useState('');
+  const [apiKey, setApiKey] = useState('');
+  const [allowPrivateNetworkAccess, setAllowPrivateNetworkAccess] = useState(true);
+  const [tlsVerificationEnabled, setTlsVerificationEnabled] = useState(true);
+  const [state, setState] = useState<'idle' | 'saving' | 'failed'>('idle');
+  const submit = async (event: FormEvent) => {
+    event.preventDefault(); setState('saving');
+    try {
+      const instance = await createInstance({ name, kind, baseUrl, allowPrivateNetworkAccess, tlsVerificationEnabled });
+      if (apiKey.trim()) await putApiKey(instance.id, apiKey.trim());
+      setName(''); setBaseUrl(''); setApiKey(''); setState('idle'); onCreated();
+    } catch { setState('failed'); }
+  };
+  return (
+    <form className="instance-form" onSubmit={submit}>
+      <div><p className="eyebrow">{t('instance.addEyebrow')}</p><h3>{t('instance.addTitle')}</h3><p className="muted">{t('instance.addBody')}</p></div>
+      <label>{t('instance.name')}<input onChange={(event) => setName(event.target.value)} required value={name} /></label>
+      <label>{t('instance.kind')}<select onChange={(event) => setKind(event.target.value as InstanceKind)} value={kind}>{instanceKinds.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+      <label>{t('instance.baseUrl')}<input onChange={(event) => setBaseUrl(event.target.value)} placeholder="https://sonarr.example" required type="url" value={baseUrl} /></label>
+      <label>{t('instance.apiKey')}<input autoComplete="off" onChange={(event) => setApiKey(event.target.value)} type="password" value={apiKey} /></label>
+      <label className="checkbox-label"><input checked={allowPrivateNetworkAccess} onChange={(event) => setAllowPrivateNetworkAccess(event.target.checked)} type="checkbox" />{t('instance.allowPrivateNetwork')}</label>
+      <label className="checkbox-label"><input checked={tlsVerificationEnabled} onChange={(event) => setTlsVerificationEnabled(event.target.checked)} type="checkbox" />{t('instance.verifyTls')}</label>
+      {state === 'failed' && <p className="form-error" role="alert">{t('instance.addFailed')}</p>}
+      <button disabled={state === 'saving'} type="submit">{state === 'saving' ? <LoaderCircle className="spin" size={17} /> : <Server size={17} />}{t('instance.add')}</button>
+    </form>
+  );
+}
+
+function InstanceList({ canManage, instances, onChanged }: {
+  canManage: boolean; instances: readonly InstanceSummary[]; onChanged: () => void;
+}) {
   const { t } = useTranslation();
   return (
     <div className="instance-list">
       {instances.map((instance) => (
-        <article className="instance-row" key={instance.id}>
+        <InstanceRow canManage={canManage} instance={instance} key={instance.id} onChanged={onChanged} />
+      ))}
+    </div>
+  );
+}
+
+function InstanceRow({ canManage, instance, onChanged }: {
+  canManage: boolean; instance: InstanceSummary; onChanged: () => void;
+}) {
+  const { t } = useTranslation();
+  const [state, setState] = useState<'idle' | 'probing' | 'connected' | 'failed'>('idle');
+  const [probeOutcome, setProbeOutcome] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(instance.name);
+  const [baseUrl, setBaseUrl] = useState(instance.baseUrl);
+  const [apiKey, setApiKey] = useState('');
+  const [allowPrivateNetworkAccess, setAllowPrivateNetworkAccess] = useState(instance.allowPrivateNetworkAccess);
+  const [tlsVerificationEnabled, setTlsVerificationEnabled] = useState(instance.tlsVerificationEnabled);
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [saving, setSaving] = useState(false);
+  const probe = async () => {
+    setState('probing'); setProbeOutcome(null);
+    try {
+      const { connected, outcome } = await probeInstance(instance.id);
+      setState(connected ? 'connected' : 'failed');
+      setProbeOutcome(outcome);
+      if (connected) onChanged();
+    } catch { setState('failed'); setProbeOutcome('request_failed'); }
+  };
+  return (
+        <article className="instance-row">
           <div className="service-mark"><Server size={20} /></div>
           <div className="service-copy"><div><h3>{instance.name}</h3><span>{instance.kind}</span></div><p>{new URL(instance.baseUrl).host}</p></div>
           <div className="service-flags">
             <StatusPill good={instance.enabled} label={t(instance.enabled ? 'instance.enabled' : 'instance.disabled')} />
             <StatusPill good={instance.credentialsConfigured} label={t(instance.credentialsConfigured ? 'instance.keyConfigured' : 'instance.keyMissing')} />
             <StatusPill good={instance.tlsVerificationEnabled} label={t(instance.tlsVerificationEnabled ? 'instance.tlsVerified' : 'instance.tlsBypass')} />
+            {canManage && <button className="secondary instance-probe" disabled={state === 'probing'} onClick={probe} type="button">{state === 'probing' ? <LoaderCircle className="spin" size={14} /> : <RefreshCw size={14} />}{t('instance.probe')}</button>}
+            {canManage && <button className="secondary instance-probe" onClick={() => setEditing(!editing)} type="button">{t('instance.edit')}</button>}
+            {state === 'connected' && <span className="pill good">{t('instance.probeConnected')}</span>}
+            {state === 'failed' && <span className="pill warning">{t('instance.probeFailed', { outcome: probeOutcome })}</span>}
           </div>
+          {editing && <div className="instance-edit">
+            <label>{t('instance.name')}<input onChange={(event) => setName(event.target.value)} value={name} /></label>
+            <label>{t('instance.baseUrl')}<input onChange={(event) => setBaseUrl(event.target.value)} type="url" value={baseUrl} /></label>
+            <label>{t('instance.apiKeyReplace')}<input autoComplete="off" onChange={(event) => setApiKey(event.target.value)} type="password" value={apiKey} /></label>
+            <label className="checkbox-label"><input checked={allowPrivateNetworkAccess} onChange={(event) => setAllowPrivateNetworkAccess(event.target.checked)} type="checkbox" />{t('instance.allowPrivateNetwork')}</label>
+            <label className="checkbox-label"><input checked={tlsVerificationEnabled} onChange={(event) => setTlsVerificationEnabled(event.target.checked)} type="checkbox" />{t('instance.verifyTls')}</label>
+            {!tlsVerificationEnabled && <p className="form-error">{t('instance.tlsWarning')}</p>}
+            <button className="secondary" disabled={saving} onClick={async () => { setSaving(true); try { await updateInstance({ id: instance.id, name, kind: instance.kind, baseUrl, enabled: instance.enabled, instanceGroupId: instance.instanceGroupId, allowPrivateNetworkAccess, tlsVerificationEnabled }); if (apiKey.trim()) await putApiKey(instance.id, apiKey.trim()); setApiKey(''); setEditing(false); onChanged(); } catch { setState('failed'); } finally { setSaving(false); } }} type="button">{t('instance.save')}</button>
+            <div className="instance-delete"><strong>{t('instance.deleteTitle')}</strong><p>{t('instance.deleteBody', { name: instance.name })}</p><label>{t('instance.deleteConfirm')}<input onChange={(event) => setDeleteConfirmation(event.target.value)} value={deleteConfirmation} /></label><button disabled={deleteConfirmation !== instance.name || saving} onClick={async () => { setSaving(true); try { await deleteInstance(instance.id); onChanged(); } catch { setState('failed'); } finally { setSaving(false); } }} type="button">{t('instance.delete')}</button></div>
+          </div>}
         </article>
-      ))}
-    </div>
   );
 }
 
