@@ -617,6 +617,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/automation/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Lists enabled and disabled durable schedules with their latest run. Requires a global tasks.execute grant because the list spans all instance scopes. */
+        get: operations["listAutomationJobs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/automation/jobs/{scheduleId}/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Queues one immediate execution of an enabled schedule. The required idempotency key deterministically identifies the queued run; retrying the same request returns the existing run. Manual execution never advances the cron planner watermark. Requires a global tasks.execute grant. */
+        post: operations["startAutomationJob"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/operations/search": {
         parameters: {
             query?: never;
@@ -1100,6 +1134,34 @@ export interface components {
              * @description Future UTC timestamp no more than 30 days away; null clears the snooze.
              */
             snoozedUntil: string | null;
+        };
+        /** @enum {string} */
+        AutomationJobState: "pending" | "running" | "retry" | "succeeded" | "failed";
+        AutomationJobSchedule: {
+            /** Format: uuid */
+            id: string;
+            type: string;
+            cron: string;
+            timeZone: string;
+            enabled: boolean;
+            /** Format: date-time */
+            lastEnqueuedAt: string | null;
+            latestState: components["schemas"]["AutomationJobState"] | null;
+            /** Format: date-time */
+            latestStartedAt: string | null;
+            /** Format: date-time */
+            latestCompletedAt: string | null;
+            latestErrorCode: string | null;
+        };
+        ManualJobStart: {
+            /** Format: uuid */
+            jobId: string;
+            /** Format: uuid */
+            scheduleId: string;
+            state: components["schemas"]["AutomationJobState"];
+            /** Format: date-time */
+            scheduledFor: string;
+            replayed: boolean;
         };
         LiveSnapshot: {
             /** @constant */
@@ -2645,6 +2707,58 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthIncident"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AuthorizationMutationForbidden"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    listAutomationJobs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Durable schedules and their latest run state */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomationJobSchedule"][];
+                };
+            };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
+        };
+    };
+    startAutomationJob: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+                /** @description Must exactly match the __Host-arrcontrol_csrf cookie. */
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
+            };
+            path: {
+                scheduleId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Immediate run accepted or replayed */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManualJobStart"];
                 };
             };
             400: components["responses"]["Problem"];

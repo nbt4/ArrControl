@@ -13,6 +13,7 @@ export type AuditEvent = components['schemas']['AuditEvent'];
 export type MissingPage = components['schemas']['MissingPage'];
 export type QueueItem = components['schemas']['AggregatedQueueItem'];
 export type HistoryItem = components['schemas']['AggregatedHistoryItem'];
+export type AutomationJobSchedule = components['schemas']['AutomationJobSchedule'];
 
 export interface DashboardSnapshot {
   status: SystemStatus;
@@ -222,4 +223,19 @@ export async function listHistory(): Promise<readonly HistoryItem[]> {
   const result = await api.GET('/history', { params: { query: { limit: 100 } } });
   if (!result.data) throw new Error('history_unavailable');
   return result.data;
+}
+
+export async function listAutomationJobs(): Promise<readonly AutomationJobSchedule[]> {
+  const result = await api.GET('/automation/jobs');
+  if (!result.data) throw new Error('automation_jobs_unavailable');
+  return result.data;
+}
+
+export async function startAutomationJob(scheduleId: string): Promise<void> {
+  const token = await csrfToken();
+  const idempotencyKey = crypto.randomUUID();
+  const result = await api.POST('/automation/jobs/{scheduleId}/start', {
+    params: { path: { scheduleId }, header: { 'X-CSRF-Token': token, 'Idempotency-Key': idempotencyKey } },
+  });
+  if (!result.data) throw new Error('automation_job_start_failed');
 }

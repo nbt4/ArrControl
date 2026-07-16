@@ -81,6 +81,25 @@ public sealed record ClaimedJob(
     Guid LeaseToken,
     DateTimeOffset LeaseUntil);
 
+public sealed record JobScheduleDetails(
+    Guid Id,
+    string Type,
+    string Cron,
+    string TimeZone,
+    bool Enabled,
+    DateTimeOffset? LastEnqueuedAt,
+    string? LatestState,
+    DateTimeOffset? LatestStartedAt,
+    DateTimeOffset? LatestCompletedAt,
+    string? LatestErrorCode);
+
+public sealed record ManualJobStartResult(
+    Guid JobId,
+    Guid ScheduleId,
+    string State,
+    DateTimeOffset ScheduledFor,
+    bool Replayed);
+
 public sealed record SyncCheckpointUpdate(
     Guid InstanceId,
     string Stream,
@@ -151,6 +170,60 @@ public interface IJobSchedulerStore
         ClaimedJob job,
         DateTimeOffset availableAt,
         CancellationToken cancellationToken);
+}
+
+public interface IJobControlStore
+{
+    Task<IReadOnlyList<JobScheduleDetails>> ListAsync(CancellationToken cancellationToken);
+
+    Task<ManualJobStartResult?> StartAsync(
+        Guid scheduleId,
+        Guid jobId,
+        ArrControl.Application.Authorization.RbacActorContext actor,
+        DateTimeOffset requestedAt,
+        CancellationToken cancellationToken);
+}
+
+public sealed class JobControlService(
+    IJobControlStore store,
+    TimeProvider timeProvider)
+{
+    public Task<IReadOnlyList<JobScheduleDetails>> ListAsync(CancellationToken cancellationToken) =>
+        store.ListAsync(cancellationToken);
+
+    public async Task<ManualJobStartResult?> StartAsync(
+        Guid scheduleId,
+        string idempotencyKey,
+        ArrControl.Application.Authorization.RbacActorContext actor,
+        CancellationToken cancellationToken)
+    {
+        if (scheduleId == Guid.Empty
+            || string.IsNullOrWhiteSpace(idempotencyKey)
+            || idempotencyKey.Length > 128
+            || idempotencyKey.Any(char.IsControl))
+        {
+            throw new ArgumentException("The manual job request is invalid.");
+        }
+
+        var jobId = DeterministicGuid.Create(scheduleId, idempotencyKey.Trim());
+        return await store.StartAsync(
+            scheduleId, jobId, actor, timeProvider.GetUtcNow(), cancellationToken);
+    }
+}
+
+internal static class DeterministicGuid
+{
+    public static Guid Create(Guid namespaceId, string value)
+    {
+        Span<byte> input = stackalloc byte[16 + System.Text.Encoding.UTF8.GetByteCount(value)];
+        namespaceId.TryWriteBytes(input);
+        System.Text.Encoding.UTF8.GetBytes(value, input[16..]);
+        var hash = System.Security.Cryptography.SHA256.HashData(input);
+        var bytes = hash[..16];
+        bytes[6] = (byte)((bytes[6] & 0x0f) | 0x50);
+        bytes[8] = (byte)((bytes[8] & 0x3f) | 0x80);
+        return new Guid(bytes);
+    }
 }
 
 public sealed class ScheduledJobException(string code) : Exception(code)

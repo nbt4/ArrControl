@@ -161,6 +161,7 @@ app.MapActivity();
 app.MapOperations();
 app.MapSearch();
 app.MapHealthIncidents();
+app.MapAutomationJobs();
 app.MapLiveEvents();
 app.MapAudit();
 app.MapHealthChecks("/health/live", new() { Predicate = _ => false }).AllowAnonymous();

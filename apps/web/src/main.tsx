@@ -1,13 +1,13 @@
 import React, { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
-  Activity, AlertTriangle, CheckCircle2, Database, FileDown, KeyRound, Languages, LoaderCircle,
+  Activity, AlertTriangle, CheckCircle2, Database, FileDown, KeyRound, Languages, LoaderCircle, Play,
   LockKeyhole, LogIn, LogOut, RefreshCw, Server, ShieldCheck, ShieldOff,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import type { AuditEvent, DashboardSnapshot, HealthIncident, HistoryItem, InstanceKind, InstanceSummary, MissingPage, QueueItem } from './api/client';
+import type { AuditEvent, AutomationJobSchedule, DashboardSnapshot, HealthIncident, HistoryItem, InstanceKind, InstanceSummary, MissingPage, QueueItem } from './api/client';
 import {
-  createInstance, deleteInstance, exportDiagnostics, listHistory, listMissing, listQueue, loadDashboard, login, logout, probeInstance, putApiKey, setHealthAcknowledgement, setHealthSnooze, updateInstance,
+  createInstance, deleteInstance, exportDiagnostics, listAutomationJobs, listHistory, listMissing, listQueue, loadDashboard, login, logout, probeInstance, putApiKey, setHealthAcknowledgement, setHealthSnooze, startAutomationJob, updateInstance,
   updatePreferences,
 } from './api/client';
 import { buildDashboardMetrics } from './dashboard';
@@ -22,11 +22,11 @@ type ViewState =
   | { kind: 'ready'; snapshot: DashboardSnapshot }
   | { kind: 'error' };
 
-type Page = 'overview' | 'missing' | 'queue' | 'history' | 'health' | 'audit' | 'settings';
+type Page = 'overview' | 'missing' | 'queue' | 'history' | 'health' | 'jobs' | 'audit' | 'settings';
 
 function pageFromHash(): Page {
   const value = window.location.hash.slice(1);
-  return ['missing', 'queue', 'history', 'health', 'audit', 'settings'].includes(value) ? value as Page : 'overview';
+  return ['missing', 'queue', 'history', 'health', 'jobs', 'audit', 'settings'].includes(value) ? value as Page : 'overview';
 }
 
 const metricIcons = [Activity, Server, KeyRound, ShieldCheck] as const;
@@ -94,6 +94,7 @@ function App() {
 
   const locale = normalizeLocale(i18n.resolvedLanguage);
   const authorization = view.kind === 'ready' ? view.snapshot.authorization : null;
+  const pageTitle = page === 'overview' ? t('dashboard.title') : t(`app.navigation.${page}`);
   const savePreferences = async (nextLocale: SupportedLocale, timeZone: string) => {
     await i18n.changeLanguage(nextLocale);
     localStorage.setItem(localeStorageKey, nextLocale);
@@ -117,6 +118,7 @@ function App() {
           <a className={page === 'queue' ? 'active' : ''} href="#queue">{t('app.navigation.queue')}</a>
           <a className={page === 'history' ? 'active' : ''} href="#history">{t('app.navigation.history')}</a>
           <a className={page === 'health' ? 'active' : ''} href="#health">{t('app.navigation.health')}</a>
+          <a className={page === 'jobs' ? 'active' : ''} href="#jobs">{t('app.navigation.jobs')}</a>
           <a className={page === 'audit' ? 'active' : ''} href="#audit">{t('app.navigation.audit')}</a>
           <a className={page === 'settings' ? 'active' : ''} href="#settings">{t('app.navigation.settings')}</a>
         </nav>
@@ -126,8 +128,8 @@ function App() {
         <header>
           <div>
             <p className="eyebrow">{t('dashboard.eyebrow')}</p>
-            <h1>{t('dashboard.title')}</h1>
-            <p className="muted">{t('dashboard.subtitle')}</p>
+            <h1>{pageTitle}</h1>
+            <p className="muted">{page === 'overview' ? t('dashboard.subtitle') : t('app.liveApi')}</p>
           </div>
           <div className="header-actions">
             <PreferenceControls
@@ -156,6 +158,9 @@ function PageContent({ page, refresh, snapshot, timeZone }: {
   if (page === 'history') return <HistoryScreen authorized={snapshot.authorization !== null} timeZone={timeZone} />;
   if (page === 'health') return snapshot.authorization && snapshot.incidents
     ? <HealthPanel canManage={snapshot.authorization.permissions.some((grant) => grant.code === 'tasks.execute')} incidents={snapshot.incidents} onChanged={refresh} timeZone={timeZone} />
+    : <LoginPanel onSuccess={refresh} />;
+  if (page === 'jobs') return snapshot.authorization
+    ? <JobsScreen canManage={snapshot.authorization.permissions.some((grant) => grant.code === 'tasks.execute' && grant.global)} timeZone={timeZone} />
     : <LoginPanel onSuccess={refresh} />;
   if (page === 'audit') return snapshot.authorization && snapshot.audit
     ? <AuditPanel events={snapshot.audit} timeZone={timeZone} />
@@ -245,6 +250,31 @@ function HistoryScreen({ authorized, timeZone }: { authorized: boolean; timeZone
   if (!authorized) return <LoginPanel onSuccess={() => window.location.reload()} />;
   return <section className="workspace" id="history"><div className="panel-heading"><div><p className="eyebrow">{t('history.eyebrow')}</p><h2>{t('history.title')}</h2></div></div>
     {failed ? <p className="form-error">{t('history.failed')}</p> : items === null ? <LoadingState /> : items.length === 0 ? <Notice icon={CheckCircle2} title={t('history.emptyTitle')}>{t('history.emptyBody')}</Notice> : <div className="data-list">{items.map((item) => <article className="data-row" key={`${item.instanceId}:${item.providerKey}:${item.eventAt}`}><div><strong>{item.title}</strong><p>{item.instanceName} · {item.eventType} · {formatDateTime(item.eventAt, translation.resolvedLanguage ?? 'en', timeZone)}</p></div><div className="service-flags"><StatusPill good={!item.stale} label={item.stale ? t('history.stale') : t('history.fresh')} /></div></article>)}</div>}
+  </section>;
+}
+
+function JobsScreen({ canManage, timeZone }: { canManage: boolean; timeZone: string }) {
+  const { t, i18n: translation } = useTranslation();
+  const [jobs, setJobs] = useState<readonly AutomationJobSchedule[] | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const load = useCallback(() => {
+    setFailed(false);
+    listAutomationJobs().then(setJobs).catch(() => setFailed(true));
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  const start = async (scheduleId: string) => {
+    setBusyId(scheduleId); setFailed(false);
+    try { await startAutomationJob(scheduleId); await new Promise((resolve) => window.setTimeout(resolve, 350)); load(); }
+    catch { setFailed(true); } finally { setBusyId(null); }
+  };
+  return <section className="workspace jobs-panel" id="jobs" aria-labelledby="jobs-title">
+    <div className="panel-heading"><div><p className="eyebrow">{t('jobs.eyebrow')}</p><h2 id="jobs-title">{t('jobs.title')}</h2><p className="muted">{t('jobs.description')}</p></div><span className="pill">{jobs?.length ?? 0} {t('jobs.schedules')}</span></div>
+    {failed ? <p className="form-error" role="alert">{t('jobs.failed')}</p> : jobs === null ? <LoadingState /> : jobs.length === 0 ? <Notice icon={CheckCircle2} title={t('jobs.emptyTitle')}>{t('jobs.emptyBody')}</Notice> : <div className="job-grid">{jobs.map((job) => <article className="job-card" key={job.id}>
+      <div className="job-card-heading"><div><span className={`pill ${job.latestState === 'failed' ? 'danger' : job.latestState === 'retry' ? 'warning' : ''}`}>{job.latestState ?? t('jobs.notRun')}</span><h3>{job.type}</h3></div><button className="secondary" disabled={!canManage || !job.enabled || busyId === job.id} onClick={() => void start(job.id)} type="button"><Play size={16} />{busyId === job.id ? t('jobs.starting') : t('jobs.start')}</button></div>
+      <dl><div><dt>{t('jobs.schedule')}</dt><dd>{job.cron} · {job.timeZone}</dd></div><div><dt>{t('jobs.lastRun')}</dt><dd>{job.latestCompletedAt ? formatDateTime(job.latestCompletedAt, translation.resolvedLanguage ?? 'en', timeZone) : t('jobs.notRun')}</dd></div>{job.latestErrorCode && <div><dt>{t('jobs.error')}</dt><dd>{job.latestErrorCode}</dd></div>}</dl>
+    </article>)}</div>}
+    {!canManage && <p className="muted jobs-note">{t('jobs.permissionRequired')}</p>}
   </section>;
 }
 

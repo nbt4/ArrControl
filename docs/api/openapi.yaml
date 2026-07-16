@@ -556,6 +556,28 @@ paths:
         '401': { $ref: '#/components/responses/AuthenticationRequired' }
         '403': { $ref: '#/components/responses/AuthorizationMutationForbidden' }
         '404': { $ref: '#/components/responses/Problem' }
+  /automation/jobs:
+    get:
+      operationId: listAutomationJobs
+      description: Lists enabled and disabled durable schedules with their latest run. Requires a global tasks.execute grant because the list spans all instance scopes.
+      responses:
+        '200': { description: Durable schedules and their latest run state, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/AutomationJobSchedule' } } } } }
+        '401': { $ref: '#/components/responses/AuthenticationRequired' }
+        '403': { $ref: '#/components/responses/AccessDenied' }
+  /automation/jobs/{scheduleId}/start:
+    post:
+      operationId: startAutomationJob
+      description: Queues one immediate execution of an enabled schedule. The required idempotency key deterministically identifies the queued run; retrying the same request returns the existing run. Manual execution never advances the cron planner watermark. Requires a global tasks.execute grant.
+      parameters:
+        - { name: scheduleId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string, minLength: 1, maxLength: 128 } }
+        - { $ref: '#/components/parameters/CsrfToken' }
+      responses:
+        '202': { description: Immediate run accepted or replayed, content: { application/json: { schema: { $ref: '#/components/schemas/ManualJobStart' } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/AuthenticationRequired' }
+        '403': { $ref: '#/components/responses/AuthorizationMutationForbidden' }
+        '404': { $ref: '#/components/responses/Problem' }
   /operations/search:
     post:
       operationId: startSearchOperation
@@ -994,6 +1016,32 @@ components:
       additionalProperties: false
       required: [snoozedUntil]
       properties: { snoozedUntil: { type: [string, 'null'], format: date-time, description: Future UTC timestamp no more than 30 days away; null clears the snooze. } }
+    AutomationJobState: { type: string, enum: [pending,running,retry,succeeded,failed] }
+    AutomationJobSchedule:
+      type: object
+      additionalProperties: false
+      required: [id,type,cron,timeZone,enabled,lastEnqueuedAt,latestState,latestStartedAt,latestCompletedAt,latestErrorCode]
+      properties:
+        id: { type: string, format: uuid }
+        type: { type: string, maxLength: 64 }
+        cron: { type: string, maxLength: 160 }
+        timeZone: { type: string, maxLength: 128 }
+        enabled: { type: boolean }
+        lastEnqueuedAt: { type: [string, 'null'], format: date-time }
+        latestState: { oneOf: [{ $ref: '#/components/schemas/AutomationJobState' }, { type: 'null' }] }
+        latestStartedAt: { type: [string, 'null'], format: date-time }
+        latestCompletedAt: { type: [string, 'null'], format: date-time }
+        latestErrorCode: { type: [string, 'null'], maxLength: 128 }
+    ManualJobStart:
+      type: object
+      additionalProperties: false
+      required: [jobId,scheduleId,state,scheduledFor,replayed]
+      properties:
+        jobId: { type: string, format: uuid }
+        scheduleId: { type: string, format: uuid }
+        state: { $ref: '#/components/schemas/AutomationJobState' }
+        scheduledFor: { type: string, format: date-time }
+        replayed: { type: boolean }
     LiveSnapshot:
       type: object
       additionalProperties: false

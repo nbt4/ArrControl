@@ -1,7 +1,10 @@
 using System.Data;
+using System.Text.Json;
+using ArrControl.Application.Authorization;
 using ArrControl.Application.Automation;
 using ArrControl.Infrastructure.Persistence;
 using ArrControl.Infrastructure.Persistence.Automation;
+using ArrControl.Infrastructure.Persistence.Operations;
 using Microsoft.EntityFrameworkCore;
 
 namespace ArrControl.Infrastructure.Automation;
@@ -9,8 +12,109 @@ namespace ArrControl.Infrastructure.Automation;
 public sealed class EfJobSchedulerStore(
     ArrControlDbContext dbContext,
     IDbContextFactory<ArrControlDbContext> dbContextFactory,
-    TimeProvider timeProvider) : IJobSchedulerStore
+    TimeProvider timeProvider) : IJobSchedulerStore, IJobControlStore
 {
+    public async Task<IReadOnlyList<JobScheduleDetails>> ListAsync(
+        CancellationToken cancellationToken)
+    {
+        var schedules = await dbContext.Set<ScheduleEntity>().AsNoTracking()
+            .OrderBy(schedule => schedule.Type)
+            .ThenBy(schedule => schedule.ScopeKey)
+            .Select(schedule => new
+            {
+                schedule.Id,
+                schedule.Type,
+                schedule.Cron,
+                schedule.TimeZone,
+                schedule.Enabled,
+                schedule.LastEnqueuedAt,
+                Latest = schedule.JobRuns.OrderByDescending(run => run.CreatedAt)
+                    .Select(run => new
+                    {
+                        run.State,
+                        run.StartedAt,
+                        run.CompletedAt,
+                        run.ErrorCode,
+                    })
+                    .FirstOrDefault(),
+            })
+            .ToArrayAsync(cancellationToken);
+        return schedules.Select(schedule => new JobScheduleDetails(
+            schedule.Id,
+            schedule.Type,
+            schedule.Cron,
+            schedule.TimeZone,
+            schedule.Enabled,
+            schedule.LastEnqueuedAt,
+            schedule.Latest?.State,
+            schedule.Latest?.StartedAt,
+            schedule.Latest?.CompletedAt,
+            schedule.Latest?.ErrorCode)).ToArray();
+    }
+
+    public async Task<ManualJobStartResult?> StartAsync(
+        Guid scheduleId,
+        Guid jobId,
+        RbacActorContext actor,
+        DateTimeOffset requestedAt,
+        CancellationToken cancellationToken)
+    {
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(
+            IsolationLevel.ReadCommitted, cancellationToken);
+        var schedule = await dbContext.Set<ScheduleEntity>()
+            .FromSqlInterpolated($"SELECT * FROM schedules WHERE id = {scheduleId} FOR UPDATE")
+            .SingleOrDefaultAsync(cancellationToken);
+        if (schedule is null || !schedule.Enabled)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return null;
+        }
+
+        var existing = await dbContext.Set<JobRunEntity>()
+            .AsNoTracking()
+            .SingleOrDefaultAsync(run => run.Id == jobId, cancellationToken);
+        if (existing is not null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return new ManualJobStartResult(
+                existing.Id, existing.ScheduleId, existing.State, existing.ScheduledFor, true);
+        }
+
+        // Do not change LastEnqueuedAt: manual executions must not make the cron planner skip an occurrence.
+        var scheduledFor = requestedAt;
+        while (await dbContext.Set<JobRunEntity>().AnyAsync(
+                   run => run.ScheduleId == scheduleId && run.ScheduledFor == scheduledFor,
+                   cancellationToken))
+            scheduledFor = scheduledFor.AddTicks(1);
+        dbContext.Add(new JobRunEntity
+        {
+            Id = jobId,
+            ScheduleId = scheduleId,
+            State = JobRunStates.Pending,
+            Attempts = 0,
+            ScheduledFor = scheduledFor,
+            AvailableAt = scheduledFor,
+            CreatedAt = requestedAt,
+        });
+        dbContext.Add(new AuditEventEntity
+        {
+            Id = Guid.CreateVersion7(),
+            OccurredAt = requestedAt,
+            ActorUserId = actor.UserId,
+            ActorType = "user",
+            ActorIdentifier = actor.Email,
+            Action = "automation.job_start",
+            ScopeJson = JsonSerializer.Serialize(new { kind = "schedule", scheduleId, schedule.Type }),
+            CorrelationId = actor.RequestContext.CorrelationId,
+            Outcome = "accepted",
+            SummaryJson = JsonSerializer.Serialize(new { jobId, manual = true }),
+            IpAddress = actor.RequestContext.IpAddress,
+        });
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return new ManualJobStartResult(jobId, scheduleId, JobRunStates.Pending, scheduledFor, false);
+    }
+
     public async Task<IReadOnlyList<SchedulePlanningState>> ListEnabledSchedulesAsync(
         CancellationToken cancellationToken) =>
         await dbContext.Set<ScheduleEntity>()

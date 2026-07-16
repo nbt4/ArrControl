@@ -1,5 +1,9 @@
 using ArrControl.Application.Automation;
+using ArrControl.Api.Authorization;
+using ArrControl.Api.Identity;
+using ArrControl.Application.Authorization;
 using ArrControl.Infrastructure.Automation;
+using Microsoft.AspNetCore.Mvc;
 
 namespace ArrControl.Api.Automation;
 
@@ -27,11 +31,65 @@ public static class AutomationSchedulerApi
         services.AddSingleton(settings);
         services.AddSingleton<ICronScheduleCalculator, CronosScheduleCalculator>();
         services.AddScoped<IJobSchedulerStore, EfJobSchedulerStore>();
+        services.AddScoped<IJobControlStore>(provider =>
+            (EfJobSchedulerStore)provider.GetRequiredService<IJobSchedulerStore>());
         services.AddScoped<JobSchedulerService>();
+        services.AddScoped<JobControlService>();
         services.AddScoped<JobExecutionEngine>();
         services.AddHostedService<AutomationSchedulerHostedService>();
         return services;
     }
+
+    public static IEndpointRouteBuilder MapAutomationJobs(this IEndpointRouteBuilder endpoints)
+    {
+        var group = endpoints.MapGroup("/api/v1/automation/jobs").WithTags("Automation")
+            .RequireAuthorization(RbacPolicyNames.Global(RbacPermissions.TasksExecute));
+        group.MapGet("", ListAsync)
+            .WithName("listAutomationJobs")
+            .Produces<JobScheduleDetails[]>()
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden);
+        group.MapPost("/{scheduleId:guid}/start", StartAsync)
+            .WithName("startAutomationJob")
+            .AddEndpointFilter<RequireCsrfTokenFilter>()
+            .WithMetadata(new RequestSizeLimitAttribute(0))
+            .Produces<ManualJobStartResult>(StatusCodes.Status202Accepted)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+        return endpoints;
+    }
+
+    private static async Task<IResult> ListAsync(
+        JobControlService service,
+        CancellationToken cancellationToken) =>
+        Results.Ok(await service.ListAsync(cancellationToken));
+
+    private static async Task<IResult> StartAsync(
+        Guid scheduleId,
+        [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
+        HttpContext context,
+        JobControlService service,
+        CancellationToken cancellationToken)
+    {
+        if (!RbacHttpContext.TryGetActor(context, out var actor))
+            return Problem(context, StatusCodes.Status401Unauthorized, "authentication_required");
+        try
+        {
+            var result = await service.StartAsync(scheduleId, idempotencyKey ?? string.Empty, actor, cancellationToken);
+            return result is null
+                ? Problem(context, StatusCodes.Status404NotFound, "automation_schedule_not_found")
+                : Results.Accepted($"/api/v1/automation/jobs/{scheduleId}", result);
+        }
+        catch (ArgumentException)
+        {
+            return Problem(context, StatusCodes.Status400BadRequest, "automation_job_request_invalid");
+        }
+    }
+
+    private static IResult Problem(HttpContext context, int status, string code) =>
+        AuthApiProblem.Create(context, status, "The automation job request could not be completed.", code);
 
     private static TimeSpan ReadTimeSpan(
         IConfiguration configuration,

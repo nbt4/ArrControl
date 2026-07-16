@@ -4,7 +4,7 @@ export const en = {
     skipToContent: 'Skip to main content',
     navigation: {
       label: 'Primary navigation', overview: 'Overview', library: 'Library', missing: 'Missing',
-      queue: 'Queue', history: 'History', health: 'Health', audit: 'Audit', settings: 'Settings',
+      queue: 'Queue', history: 'History', health: 'Health', jobs: 'Jobs', audit: 'Audit', settings: 'Settings',
     },
     liveApi: 'Live API data',
   },
@@ -62,6 +62,13 @@ export const en = {
   history: {
     eyebrow: 'HISTORY', title: 'Recent activity', failed: 'History could not be loaded.',
     emptyTitle: 'No recent activity', emptyBody: 'No visible provider activity has been projected yet.', fresh: 'Fresh', stale: 'Stale',
+  },
+  jobs: {
+    eyebrow: 'AUTOMATION', title: 'Job control', description: 'Review durable schedules and queue an immediate execution when needed.',
+    schedules: 'schedules', schedule: 'Schedule', lastRun: 'Last run', error: 'Last error', notRun: 'Not run yet',
+    start: 'Run now', starting: 'Queueing…', failed: 'The job request could not be completed. Refresh and try again.',
+    emptyTitle: 'No schedules available', emptyBody: 'Schedules appear after enabled services are reconciled.',
+    permissionRequired: 'A global tasks.execute permission is required to start or view all schedules.',
   },
   import: {
     guidance: {

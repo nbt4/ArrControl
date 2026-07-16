@@ -4,7 +4,7 @@ export const de = {
     skipToContent: 'Zum Hauptinhalt springen',
     navigation: {
       label: 'Hauptnavigation', overview: 'Übersicht', library: 'Bibliothek', missing: 'Fehlend',
-      queue: 'Warteschlange', history: 'Verlauf', health: 'Zustand', audit: 'Audit', settings: 'Einstellungen',
+      queue: 'Warteschlange', history: 'Verlauf', health: 'Zustand', jobs: 'Jobs', audit: 'Audit', settings: 'Einstellungen',
     },
     liveApi: 'Live-API-Daten',
   },
@@ -62,6 +62,13 @@ export const de = {
   history: {
     eyebrow: 'VERLAUF', title: 'Letzte Aktivitäten', failed: 'Verlauf konnte nicht geladen werden.',
     emptyTitle: 'Keine aktuellen Aktivitäten', emptyBody: 'Es wurden noch keine sichtbaren Anbieter-Aktivitäten projiziert.', fresh: 'Aktuell', stale: 'Veraltet',
+  },
+  jobs: {
+    eyebrow: 'AUTOMATISIERUNG', title: 'Job-Steuerung', description: 'Dauerhafte Zeitpläne prüfen und bei Bedarf eine sofortige Ausführung einreihen.',
+    schedules: 'Zeitpläne', schedule: 'Zeitplan', lastRun: 'Letzte Ausführung', error: 'Letzter Fehler', notRun: 'Noch nicht ausgeführt',
+    start: 'Jetzt starten', starting: 'Wird eingereiht…', failed: 'Die Job-Anfrage konnte nicht abgeschlossen werden. Aktualisieren und erneut versuchen.',
+    emptyTitle: 'Keine Zeitpläne verfügbar', emptyBody: 'Zeitpläne erscheinen, sobald aktivierte Dienste abgeglichen wurden.',
+    permissionRequired: 'Zum Anzeigen und Starten aller Zeitpläne ist die globale Berechtigung tasks.execute erforderlich.',
   },
   import: {
     guidance: {
