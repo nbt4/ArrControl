@@ -1,0 +1,17 @@
+[
+  {
+    "id": 21,
+    "source": "DownloadClientCheck",
+    "type": "warning",
+    "message": "A download client is unavailable.",
+    "wikiUrl": "https://wiki.servarr.com/sonarr/system#health"
+  },
+  {
+    "id": 22,
+    "source": "FutureCheck",
+    "type": "critical",
+    "message": "An unknown future severity remains readable.",
+    "wikiUrl": null,
+    "futureField": "ignored"
+  }
+]

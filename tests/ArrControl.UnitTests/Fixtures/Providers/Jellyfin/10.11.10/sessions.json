@@ -1,0 +1,1 @@
+[{"UserName":"private-user","NowPlayingItem":{"Name":"Private Movie","Future":true},"PlayState":{"IsPaused":false},"TranscodingInfo":{"Future":true}},{"UserName":"private-user-2","NowPlayingItem":{"Name":"Private Episode"},"PlayState":{"IsPaused":true}},{"UserName":"idle-private-user","NowPlayingItem":null,"Future":true}]

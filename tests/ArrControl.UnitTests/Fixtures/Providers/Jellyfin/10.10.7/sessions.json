@@ -1,0 +1,1 @@
+[{"UserName":"private-user","Client":"Private TV","NowPlayingItem":{"Name":"Private Movie","Path":"/private/movie.mkv"},"PlayState":{"IsPaused":false},"TranscodingInfo":{"Path":"/private/transcode"}},{"UserName":"private-user-2","NowPlayingItem":{"Name":"Private Episode"},"PlayState":{"IsPaused":true},"TranscodingInfo":null},{"UserName":"idle-private-user","NowPlayingItem":null}]

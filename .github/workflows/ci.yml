@@ -1,34 +1,132 @@
 name: ci
+
 on:
   pull_request:
   push:
     branches: [main]
-permissions: { contents: read }
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 jobs:
   backend:
+    name: Backend validation
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
-        with: { dotnet-version: '9.0.x' }
-      - run: dotnet restore ArrControl.slnx
-      - run: dotnet build ArrControl.slnx -c Release --no-restore
-      - run: dotnet test ArrControl.slnx -c Release --no-build
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5.2.0
+        with:
+          dotnet-version: '9.0.x'
+      - name: Restore tools and dependencies
+        run: |
+          dotnet tool restore
+          dotnet restore ArrControl.slnx
+      - name: Build with warnings as errors
+        run: dotnet build ArrControl.slnx -c Release --no-restore
+      - name: Run backend tests
+        run: dotnet test ArrControl.slnx -c Release --no-build --logger "trx;LogFileName=backend.trx"
+      - name: Verify EF model matches migrations
+        run: >-
+          dotnet ef migrations has-pending-model-changes
+          --project src/ArrControl.Infrastructure/ArrControl.Infrastructure.csproj
+          --startup-project src/ArrControl.Api/ArrControl.Api.csproj
+
   frontend:
+    name: Frontend validation
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with: { version: 10 }
-      - uses: actions/setup-node@v4
-        with: { node-version: 22, cache: pnpm }
-      - run: pnpm install --no-frozen-lockfile
-      - run: pnpm build
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          version: 10.12.1
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.5.0
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Check generated API client
+        run: pnpm check:api
+      - name: Lint
+        run: pnpm lint
+      - name: Test
+        run: pnpm test
+      - name: Build production frontend
+        run: pnpm build
+      - name: Install Chromium for focused accessibility E2E
+        run: pnpm --filter @arrcontrol/web exec playwright install --with-deps chromium
+      - name: Run WCAG and keyboard E2E
+        run: pnpm test:e2e
+
   container:
+    name: Image smoke, scan, and SBOM
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     needs: [backend, frontend]
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/build-push-action@v6
-        with: { context: ., file: deploy/Dockerfile, push: false, tags: arrcontrol:test }
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+      - name: Build local image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: deploy/Dockerfile
+          load: true
+          push: false
+          tags: arrcontrol:ci
+      - name: Smoke test non-root read-only image
+        shell: bash
+        run: |
+          set -euo pipefail
+          cleanup() {
+            docker logs arrcontrol-smoke || true
+            docker rm --force arrcontrol-smoke || true
+          }
+          trap cleanup EXIT
+          test "$(docker image inspect arrcontrol:ci --format '{{.Config.User}}')" = "arrcontrol"
+          docker run --detach --name arrcontrol-smoke \
+            --read-only --tmpfs /tmp:rw,noexec,nosuid,size=64m \
+            --publish 127.0.0.1:18080:8080 \
+            --env ASPNETCORE_URLS=http://+:8080 \
+            --env ConnectionStrings__Database='Host=127.0.0.1;Database=unavailable' \
+            arrcontrol:ci
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:18080/health/live >/dev/null; then
+              break
+            fi
+            test "$attempt" -lt 30
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:18080/api/v1/system/status \
+            | jq --exit-status '.name == "ArrControl" and .status == "ok"'
+          curl --fail --silent http://127.0.0.1:18080/ \
+            | grep --fixed-strings '<div id="root"></div>'
+      - name: Scan image vulnerabilities
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: arrcontrol:ci
+          format: table
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+      - name: Generate CycloneDX SBOM
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: arrcontrol:ci
+          format: cyclonedx
+          output: artifacts/arrcontrol.cdx.json
+          scanners: vuln
+      - name: Upload SBOM
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: arrcontrol-sbom
+          path: artifacts/arrcontrol.cdx.json
+          if-no-files-found: error
+          retention-days: 14

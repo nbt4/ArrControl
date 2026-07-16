@@ -1,4 +1,5 @@
 using ArrControl.Domain;
+using Xunit;
 
 namespace ArrControl.UnitTests;
 

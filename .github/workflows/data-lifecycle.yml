@@ -1,0 +1,45 @@
+name: data-lifecycle
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: data-lifecycle-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  backup-restore-upgrade:
+    name: Backup, restore, and previous-version upgrade
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+      - name: Select previous stable image when one exists
+        id: previous
+        shell: bash
+        run: |
+          previous_tag="$(git tag --merged HEAD --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-version:refname \
+            | grep --invert-match --line-regexp "${GITHUB_REF_NAME}" | head -1 || true)"
+          if [[ -n "${previous_tag}" ]]; then
+            echo "image=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/arrcontrol:${previous_tag#v}" >> "${GITHUB_OUTPUT}"
+          fi
+      - name: Log in for previous private package
+        if: steps.previous.outputs.image != ''
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Validate data lifecycle
+        env:
+          ARRCONTROL_PREVIOUS_IMAGE: ${{ steps.previous.outputs.image }}
+        run: tests/data-lifecycle/run.sh

@@ -1,0 +1,8 @@
+name: ArrControl CodeQL configuration
+queries:
+  - uses: security-extended
+paths-ignore:
+  - apps/web/src/api/generated.ts
+  - src/ArrControl.Infrastructure/Persistence/Migrations/**/*.Designer.cs
+  - src/ArrControl.Infrastructure/Persistence/Migrations/ArrControlDbContextModelSnapshot.cs
+

@@ -1,0 +1,16 @@
+.git
+.env
+.env.*
+!.env.example
+.idea
+.vscode
+.pnpm-store
+**/bin
+**/obj
+**/node_modules
+**/dist
+**/*.log
+**/*.tsbuildinfo
+artifacts
+coverage
+secrets

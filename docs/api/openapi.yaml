@@ -11,48 +11,1100 @@ paths:
       security: []
       operationId: getSystemStatus
       responses: { '200': { description: Runtime status, content: { application/json: { schema: { $ref: '#/components/schemas/SystemStatus' } } } } }
+  /auth/csrf:
+    get:
+      security: []
+      operationId: getAuthCsrf
+      description: Issues a CSRF token in both the response and the `__Host-arrcontrol_csrf` Secure, host-only, Path=/, SameSite cookie. Send the value in `X-CSRF-Token` on authentication mutations.
+      responses:
+        '200':
+          description: CSRF token issued; the response must not be cached
+          content: { application/json: { schema: { $ref: '#/components/schemas/CsrfToken' } } }
+        '500': { $ref: '#/components/responses/Problem' }
+  /auth/me:
+    get:
+      operationId: getCurrentAuthorization
+      description: Returns the authenticated user's current effective permissions. Grants are evaluated from the database for this request and must not be cached in the session cookie.
+      responses:
+        '200':
+          description: Current identity and effective permission scopes
+          content: { application/json: { schema: { $ref: '#/components/schemas/CurrentAuthorization' } } }
+        '401': { $ref: '#/components/responses/AuthenticationRequired' }
+  /auth/preferences:
+    put:
+      operationId: updateCurrentUserPreferences
+      description: Replaces the authenticated user's UI locale and IANA timezone preference. The locale must be one of the shipped catalogs.
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/UpdateUserPreferences' } } }
+      responses:
+        '200':
+          description: Preferences persisted; the response must not be cached
+          content: { application/json: { schema: { $ref: '#/components/schemas/UserPreferences' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/AuthenticationRequired' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /auth/login:
+    post:
+      security: []
+      operationId: loginLocal
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/LocalLogin' } } }
+      responses:
+        '200':
+          description: Authenticated; rotating opaque access and refresh cookies were issued
+          content: { application/json: { schema: { $ref: '#/components/schemas/AuthSession' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '413': { $ref: '#/components/responses/Problem' }
+        '429': { $ref: '#/components/responses/Problem' }
+  /auth/refresh:
+    post:
+      security: [{ refreshCookie: [] }]
+      operationId: refreshLocalSession
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      responses:
+        '200':
+          description: Session rotated; replacement access and refresh cookies were issued
+          content: { application/json: { schema: { $ref: '#/components/schemas/AuthSession' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '429': { $ref: '#/components/responses/Problem' }
+  /auth/logout:
+    post:
+      security: []
+      operationId: logoutLocal
+      description: Idempotently revokes the identified session family and clears local authentication cookies.
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      responses:
+        '204': { description: Session revoked or already absent }
+        '403': { $ref: '#/components/responses/Problem' }
+        '429': { $ref: '#/components/responses/Problem' }
+  /auth/oidc/status:
+    get:
+      security: []
+      operationId: getOidcStatus
+      description: Reports whether OIDC is enabled without exposing provider credentials.
+      responses:
+        '200':
+          description: OIDC availability
+          content: { application/json: { schema: { $ref: '#/components/schemas/OidcStatus' } } }
+  /auth/oidc/login:
+    get:
+      security: []
+      operationId: loginOidc
+      description: Starts an OIDC Authorization Code + PKCE flow. The provider returns to the exact non-API callback `/auth/oidc/callback`; a successful callback issues ArrControl's opaque session cookies.
+      parameters:
+        - { name: returnUrl, in: query, required: false, description: Local absolute-path URL used after successful authentication., schema: { type: string, maxLength: 2048, default: / } }
+      responses:
+        '302': { description: Redirect to the configured OIDC authorization endpoint, headers: { Location: { schema: { type: string, format: uri } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '500': { $ref: '#/components/responses/Problem' }
+        '429': { $ref: '#/components/responses/Problem' }
+  /auth/oidc/logout:
+    post:
+      security: []
+      operationId: logoutOidc
+      description: Idempotently revokes the local family and clears cookies before redirecting an OIDC-authenticated session through Authentik RP-initiated logout. If the protected logout context is unavailable, only the local redirect is performed.
+      parameters:
+        - { $ref: '#/components/parameters/CsrfToken' }
+        - { name: returnUrl, in: query, required: false, description: Local absolute-path URL used after logout., schema: { type: string, maxLength: 2048, default: / } }
+      responses:
+        '302': { description: Local redirect or redirect to the discovered end-session endpoint, headers: { Location: { schema: { type: string, format: uri-reference } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '500': { $ref: '#/components/responses/Problem' }
+        '429': { $ref: '#/components/responses/Problem' }
+  /authorization/permissions:
+    get:
+      operationId: listAuthorizationPermissions
+      description: Lists the immutable permission catalog. Requires a global `authorization.manage` grant.
+      responses:
+        '200':
+          description: Permission catalog
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/PermissionDefinition' } }
+        '401': { $ref: '#/components/responses/AuthenticationRequired' }
+        '403': { $ref: '#/components/responses/AccessDenied' }
+  /authorization/roles:
+    get:
+      operationId: listAuthorizationRoles
+      description: Lists system and custom roles. Requires a global `authorization.manage` grant.
+      responses:
+        '200':
+          description: Roles and their permission bundles
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/AuthorizationRole' } }
+        '401': { $ref: '#/components/responses/AuthenticationRequired' }
+        '403': { $ref: '#/components/responses/AccessDenied' }
+  /authorization/roles/{roleId}:
+    parameters:
+      - { $ref: '#/components/parameters/RoleId' }
+    get:
+      operationId: getAuthorizationRole
+      description: Gets one system or custom role. Requires a global `authorization.manage` grant.
+      responses:
+        '200':
+          description: Role and its permission bundle
+          content: { application/json: { schema: { $ref: '#/components/schemas/AuthorizationRole' } } }
+        '400': { $ref: '#/components/responses/InvalidAuthorizationRequest' }
+        '401': { $ref: '#/components/responses/AuthenticationRequired' }
+        '403': { $ref: '#/components/responses/AccessDenied' }
+        '404': { $ref: '#/components/responses/RoleNotFound' }
+    put:
+      operationId: upsertAuthorizationRole
+      description: Idempotently creates or replaces a custom role at the supplied ID. System roles are immutable. Requires a global `authorization.manage` grant and CSRF validation.
+      parameters:
+        - { $ref: '#/components/parameters/CsrfToken' }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/UpsertAuthorizationRole' } } }
+      responses:
+        '200':
+          description: Existing custom role replaced
+          content: { application/json: { schema: { $ref: '#/components/schemas/AuthorizationRole' } } }
+        '201':
+          description: Custom role created
+          headers: { Location: { schema: { type: string, format: uri-reference } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/AuthorizationRole' } } }
+        '400': { $ref: '#/components/responses/InvalidAuthorizationRequest' }
+        '401': { $ref: '#/components/responses/AuthenticationRequired' }
+        '403': { $ref: '#/components/responses/AuthorizationMutationForbidden' }
+        '409': { $ref: '#/components/responses/RoleMutationConflict' }
+    delete:
+      operationId: deleteAuthorizationRole
+      description: Deletes a custom role and its assignments. System roles are immutable. Requires a global `authorization.manage` grant and CSRF validation.
+      parameters:
+        - { $ref: '#/components/parameters/CsrfToken' }
+      responses:
+        '204': { description: Custom role deleted }
+        '400': { $ref: '#/components/responses/InvalidAuthorizationRequest' }
+        '401': { $ref: '#/components/responses/AuthenticationRequired' }
+        '403': { $ref: '#/components/responses/AuthorizationMutationForbidden' }
+        '404': { $ref: '#/components/responses/RoleNotFound' }
+        '409': { $ref: '#/components/responses/RoleMutationConflict' }
+  /authorization/users:
+    get:
+      operationId: listAuthorizationUsers
+      description: Lists users available for manual role assignment. Requires a global `authorization.manage` grant.
+      responses:
+        '200':
+          description: Users
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/AuthorizationUser' } }
+        '401': { $ref: '#/components/responses/AuthenticationRequired' }
+        '403': { $ref: '#/components/responses/AccessDenied' }
+  /authorization/users/{userId}/role-assignments:
+    parameters:
+      - { $ref: '#/components/parameters/UserId' }
+    get:
+      operationId: listUserRoleAssignments
+      description: Lists only the user's manual global and instance-group role assignments. Requires a global `authorization.manage` grant.
+      responses:
+        '200':
+          description: Manual role assignments
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/RoleAssignment' } }
+        '400': { $ref: '#/components/responses/InvalidAuthorizationRequest' }
+        '401': { $ref: '#/components/responses/AuthenticationRequired' }
+        '403': { $ref: '#/components/responses/AccessDenied' }
+        '404': { $ref: '#/components/responses/UserNotFound' }
+    put:
+      operationId: replaceUserRoleAssignments
+      description: Idempotently replaces the complete set of manual role assignments for the user. OIDC-owned assignments are not changed. Requires a global `authorization.manage` grant and CSRF validation.
+      parameters:
+        - { $ref: '#/components/parameters/CsrfToken' }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/ReplaceRoleAssignments' } } }
+      responses:
+        '200':
+          description: Complete resulting set of manual role assignments
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/RoleAssignment' } }
+        '400': { $ref: '#/components/responses/InvalidAuthorizationRequest' }
+        '401': { $ref: '#/components/responses/AuthenticationRequired' }
+        '403': { $ref: '#/components/responses/AuthorizationMutationForbidden' }
+        '404': { $ref: '#/components/responses/AssignmentReferenceNotFound' }
+        '409': { $ref: '#/components/responses/AuthorizationLockout' }
+  /authorization/instance-groups:
+    get:
+      operationId: listAuthorizationInstanceGroups
+      description: Lists instance groups available as manual assignment scopes. Requires a global `authorization.manage` grant.
+      responses:
+        '200':
+          description: Instance groups
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/InstanceGroupSummary' } }
+        '401': { $ref: '#/components/responses/AuthenticationRequired' }
+        '403': { $ref: '#/components/responses/AccessDenied' }
   /instances:
     get:
       operationId: listInstances
-      responses: { '200': { description: Instances, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Instance' } } } } } }
+      description: Lists instances visible through a global or instance-group-scoped `instances.read` grant. Scope filtering is applied in the database; ungrouped instances require a global grant.
+      responses:
+        '200':
+          description: Authorized instances
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/InstanceSummary' } }
+        '401': { $ref: '#/components/responses/AuthenticationRequired' }
+        '403': { $ref: '#/components/responses/AccessDenied' }
     post:
       operationId: createInstance
-      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreateInstance' } } } }
-      responses: { '201': { description: Created }, '400': { $ref: '#/components/responses/Problem' } }
+      description: Creates a provider configuration in a scope where the caller has `instances.manage`. Private-network access and disabled TLS verification are explicit per-instance choices. Requires CSRF validation.
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/WriteInstance' } } } }
+      responses:
+        '201':
+          description: Instance created
+          headers: { Location: { schema: { type: string, format: uri-reference } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/InstanceDetails' } } }
+        '400': { $ref: '#/components/responses/InstanceRequestInvalid' }
+        '401': { $ref: '#/components/responses/AuthenticationRequired' }
+        '403': { $ref: '#/components/responses/AuthorizationMutationForbidden' }
+        '404': { $ref: '#/components/responses/InstanceGroupNotFound' }
+        '409': { $ref: '#/components/responses/InstanceConflict' }
+  /instances/{instanceId}:
+    parameters: [{ $ref: '#/components/parameters/InstanceId' }]
+    get:
+      operationId: getInstance
+      description: Gets one instance and its persisted capability observations when visible through `instances.read`; out-of-scope instances are returned as not found.
+      responses:
+        '200': { description: Instance details, content: { application/json: { schema: { $ref: '#/components/schemas/InstanceDetails' } } } }
+        '400': { $ref: '#/components/responses/InstanceRequestInvalid' }
+        '401': { $ref: '#/components/responses/AuthenticationRequired' }
+        '403': { $ref: '#/components/responses/AccessDenied' }
+        '404': { $ref: '#/components/responses/InstanceNotFound' }
+    put:
+      operationId: updateInstance
+      description: Replaces one instance configuration. Moving between groups requires `instances.manage` in both old and new scopes. Connection-affecting changes invalidate prior capabilities. Requires CSRF validation.
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/WriteInstance' } } } }
+      responses:
+        '200': { description: Instance updated, content: { application/json: { schema: { $ref: '#/components/schemas/InstanceDetails' } } } }
+        '400': { $ref: '#/components/responses/InstanceRequestInvalid' }
+        '401': { $ref: '#/components/responses/AuthenticationRequired' }
+        '403': { $ref: '#/components/responses/AuthorizationMutationForbidden' }
+        '404': { description: Instance or target group not found, content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } } }
+        '409': { $ref: '#/components/responses/InstanceConflict' }
+    delete:
+      operationId: deleteInstance
+      description: Deletes the instance and cascades its credentials and capabilities. Requires `instances.manage` in its scope and CSRF validation.
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      responses:
+        '204': { description: Instance deleted }
+        '400': { $ref: '#/components/responses/InstanceRequestInvalid' }
+        '401': { $ref: '#/components/responses/AuthenticationRequired' }
+        '403': { $ref: '#/components/responses/AuthorizationMutationForbidden' }
+        '404': { $ref: '#/components/responses/InstanceNotFound' }
   /instances/{instanceId}/probe:
     post:
       operationId: probeInstance
+      description: Performs a redirect-free, proxy-free, DNS-revalidated and address-pinned probe, then atomically replaces persisted capability observations. Contract-tested HTTP adapters read only their declared write-only credentials and call typed, version-checked status/health endpoints; kinds without an adapter receive only a credential-free generic transport probe. Requires `instances.manage` in the target scope and CSRF validation.
+      parameters:
+        - { $ref: '#/components/parameters/InstanceId' }
+        - { $ref: '#/components/parameters/CsrfToken' }
+      responses:
+        '200': { description: Probe result, content: { application/json: { schema: { $ref: '#/components/schemas/ConnectionProbe' } } } }
+        '400': { $ref: '#/components/responses/InstanceRequestInvalid' }
+        '401': { $ref: '#/components/responses/AuthenticationRequired' }
+        '403': { $ref: '#/components/responses/AuthorizationMutationForbidden' }
+        '404': { $ref: '#/components/responses/InstanceNotFound' }
+  /instance-groups:
+    get:
+      operationId: listInstanceGroups
+      description: Lists instance groups. Requires a global `instances.manage` grant.
+      responses:
+        '200': { description: Instance groups, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/InstanceGroupDetails' } } } } }
+        '401': { $ref: '#/components/responses/AuthenticationRequired' }
+        '403': { $ref: '#/components/responses/AccessDenied' }
+  /instance-groups/{instanceGroupId}:
+    parameters: [{ $ref: '#/components/parameters/InstanceGroupId' }]
+    put:
+      operationId: upsertInstanceGroup
+      description: Idempotently creates or renames an instance group. Requires global `instances.manage` and CSRF validation.
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/WriteInstanceGroup' } } } }
+      responses:
+        '200': { description: Group updated, content: { application/json: { schema: { $ref: '#/components/schemas/InstanceGroupDetails' } } } }
+        '201': { description: Group created, headers: { Location: { schema: { type: string, format: uri-reference } } }, content: { application/json: { schema: { $ref: '#/components/schemas/InstanceGroupDetails' } } } }
+        '400': { $ref: '#/components/responses/InstanceRequestInvalid' }
+        '401': { $ref: '#/components/responses/AuthenticationRequired' }
+        '403': { $ref: '#/components/responses/AuthorizationMutationForbidden' }
+        '409': { description: Instance-group name conflict, content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } } }
+    delete:
+      operationId: deleteInstanceGroup
+      description: Deletes an empty instance group. Groups with instances must be emptied explicitly first. Requires global `instances.manage` and CSRF validation.
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      responses:
+        '204': { description: Group deleted }
+        '400': { $ref: '#/components/responses/InstanceRequestInvalid' }
+        '401': { $ref: '#/components/responses/AuthenticationRequired' }
+        '403': { $ref: '#/components/responses/AuthorizationMutationForbidden' }
+        '404': { $ref: '#/components/responses/InstanceGroupNotFound' }
+        '409': { description: Instance group is still in use (`instance_group_in_use`)., content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } } }
+  /instances/{instanceId}/credentials:
+    get:
+      operationId: listInstanceCredentials
+      description: Lists only write-only credential metadata for an instance visible through `instances.read`. Plaintext and encryption material are never returned.
       parameters: [{ $ref: '#/components/parameters/InstanceId' }]
-      responses: { '200': { description: Capability and health probe }, '404': { $ref: '#/components/responses/Problem' } }
+      responses:
+        '200':
+          description: Configured credential purposes
+          content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/CredentialMetadata' } } } }
+        '400': { $ref: '#/components/responses/CredentialRequestInvalid' }
+        '401': { $ref: '#/components/responses/AuthenticationRequired' }
+        '403': { $ref: '#/components/responses/AccessDenied' }
+        '404': { $ref: '#/components/responses/InstanceNotFound' }
+  /instances/{instanceId}/credentials/{purpose}:
+    parameters:
+      - { $ref: '#/components/parameters/InstanceId' }
+      - { $ref: '#/components/parameters/CredentialPurpose' }
+    put:
+      operationId: putInstanceCredential
+      description: Creates or replaces a write-only credential using the target instance's effective `instances.manage` scope. Requires CSRF validation; the request is limited to 8 KiB.
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/WriteCredential' } } }
+      responses:
+        '200':
+          description: Existing credential replaced
+          content: { application/json: { schema: { $ref: '#/components/schemas/CredentialMetadata' } } }
+        '201':
+          description: Credential created
+          headers: { Location: { schema: { type: string, format: uri-reference } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/CredentialMetadata' } } }
+        '400': { $ref: '#/components/responses/CredentialRequestInvalid' }
+        '401': { $ref: '#/components/responses/AuthenticationRequired' }
+        '403': { $ref: '#/components/responses/AuthorizationMutationForbidden' }
+        '404': { $ref: '#/components/responses/InstanceNotFound' }
+        '503': { $ref: '#/components/responses/CredentialEncryptionUnavailable' }
+    delete:
+      operationId: deleteInstanceCredential
+      description: Idempotently deletes one credential using the target instance's effective `instances.manage` scope. Requires CSRF validation.
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      responses:
+        '204': { description: Credential deleted or already absent }
+        '400': { $ref: '#/components/responses/CredentialRequestInvalid' }
+        '401': { $ref: '#/components/responses/AuthenticationRequired' }
+        '403': { $ref: '#/components/responses/AuthorizationMutationForbidden' }
+        '404': { $ref: '#/components/responses/InstanceNotFound' }
   /missing:
     get:
       operationId: listMissing
-      parameters: [{ name: cursor, in: query, schema: { type: string } }, { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }]
-      responses: { '200': { description: Cursor page of missing items } }
+      description: Returns a title/ID keyset page from the last complete local catalog snapshots. Results are always intersected with the caller's current `library.read` instance-group scopes.
+      parameters:
+        - { name: cursor, in: query, schema: { type: string, maxLength: 4096 }, description: Opaque protected cursor bound to the normalized filter. }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+        - { name: savedViewId, in: query, schema: { type: string, format: uuid }, description: Uses this user-owned saved filter; inline filters are ignored. }
+        - { name: instanceId, in: query, schema: { type: array, maxItems: 100, items: { type: string, format: uuid } } }
+        - { name: kind, in: query, schema: { type: array, items: { $ref: '#/components/schemas/MissingKind' } } }
+        - { name: reason, in: query, schema: { type: array, items: { $ref: '#/components/schemas/MissingReason' }, default: [missing] } }
+        - { name: search, in: query, schema: { type: string, maxLength: 200 } }
+      responses:
+        '200': { description: Cursor page with per-source freshness, content: { application/json: { schema: { $ref: '#/components/schemas/MissingPage' } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/AuthenticationRequired' }
+        '403': { $ref: '#/components/responses/AccessDenied' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /missing/views:
+    get:
+      operationId: listMissingSavedViews
+      responses:
+        '200': { description: User-owned saved views, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/MissingSavedView' } } } } }
+        '401': { $ref: '#/components/responses/AuthenticationRequired' }
+        '403': { $ref: '#/components/responses/AccessDenied' }
+  /missing/views/{viewId}:
+    parameters: [{ name: viewId, in: path, required: true, schema: { type: string, format: uuid } }]
+    put:
+      operationId: upsertMissingSavedView
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/WriteMissingSavedView' } } } }
+      responses:
+        '200': { description: Saved view replaced, content: { application/json: { schema: { $ref: '#/components/schemas/MissingSavedView' } } } }
+        '201': { description: Saved view created, content: { application/json: { schema: { $ref: '#/components/schemas/MissingSavedView' } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/AuthenticationRequired' }
+        '403': { $ref: '#/components/responses/AuthorizationMutationForbidden' }
+        '409': { $ref: '#/components/responses/Problem' }
+    delete:
+      operationId: deleteMissingSavedView
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      responses:
+        '204': { description: Saved view deleted or already absent }
+        '401': { $ref: '#/components/responses/AuthenticationRequired' }
+        '403': { $ref: '#/components/responses/AuthorizationMutationForbidden' }
   /queue:
     get:
       operationId: listQueue
-      responses: { '200': { description: Aggregated queue snapshot } }
+      parameters: [{ name: instanceId, in: query, schema: { type: array, maxItems: 100, items: { type: string, format: uuid } } }]
+      responses:
+        '200': { description: Aggregated current queue with history correlation, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/AggregatedQueueItem' } } } } }
+        '401': { $ref: '#/components/responses/AuthenticationRequired' }
+        '403': { $ref: '#/components/responses/AccessDenied' }
+
+  /history:
+    get:
+      operationId: listHistory
+      parameters:
+        - { name: instanceId, in: query, schema: { type: array, maxItems: 100, items: { type: string, format: uuid } } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 1000, default: 200 } }
+      responses:
+        '200': { description: Aggregated recent history with current-queue correlation, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/AggregatedHistoryItem' } } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/AuthenticationRequired' }
+        '403': { $ref: '#/components/responses/AccessDenied' }
+  /events/snapshot:
+    get:
+      operationId: getLiveEventSnapshot
+      description: Returns a durable publication waterline and the REST resources the caller must read before opening the event stream. Reading the snapshot first and the REST projections second prevents reconnect gaps.
+      responses:
+        '200': { description: Caller-specific snapshot recovery contract, content: { application/json: { schema: { $ref: '#/components/schemas/LiveSnapshot' } } } }
+        '401': { $ref: '#/components/responses/AuthenticationRequired' }
+        '403': { $ref: '#/components/responses/AccessDenied' }
+  /events:
+    get:
+      operationId: streamLiveEvents
+      description: Streams redacted resource invalidations as SSE. Supply the snapshot cursor as the initial query cursor; browser reconnects use Last-Event-ID. An unknown or expired cursor yields a snapshot-required event and closes.
+      parameters:
+        - { name: cursor, in: query, required: false, schema: { type: string, maxLength: 64 }, description: Initial cursor returned by getLiveEventSnapshot. }
+        - { name: Last-Event-ID, in: header, required: false, schema: { type: string, maxLength: 64 }, description: SSE reconnect cursor; takes precedence over the query cursor. }
+      responses:
+        '200':
+          description: SSE events named changed, cursor, or snapshot-required; heartbeat comments are emitted while idle.
+          content: { text/event-stream: { schema: { type: string } } }
+        '401': { $ref: '#/components/responses/AuthenticationRequired' }
+        '403': { $ref: '#/components/responses/AccessDenied' }
+  /audit:
+    get:
+      operationId: listAuditEvents
+      description: Queries the append-only audit timeline. Because authentication and system events have no instance scope, the complete query requires a global audit.read grant.
+      parameters:
+        - { name: from, in: query, schema: { type: string, format: date-time }, description: Inclusive start; defaults to 30 days before the request. }
+        - { name: to, in: query, schema: { type: string, format: date-time }, description: Inclusive end; defaults to request time. }
+        - { name: actorUserId, in: query, schema: { type: string, format: uuid } }
+        - { name: action, in: query, schema: { type: string, maxLength: 160 }, description: Exact action code. }
+        - { name: outcome, in: query, schema: { type: string, maxLength: 32 }, description: Exact outcome code. }
+        - { name: correlationId, in: query, schema: { type: string, maxLength: 128 }, description: Exact correlation identifier. }
+        - { name: cursor, in: query, schema: { type: string, maxLength: 4096 }, description: Protected filter-bound keyset cursor. }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+      responses:
+        '200': { description: Descending audit page, content: { application/json: { schema: { $ref: '#/components/schemas/AuditPage' } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/AuthenticationRequired' }
+        '403': { $ref: '#/components/responses/AccessDenied' }
+  /diagnostics/export:
+    post:
+      operationId: exportDiagnostics
+      description: Explicitly creates a strict-redaction support archive and audits the export. It never includes credentials, names, URLs, IP addresses, paths, media metadata, raw provider payloads, audit summaries, or stable instance/group UUIDs.
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/DiagnosticsExportRequest' } } } }
+      responses:
+        '200': { description: ZIP containing diagnostics.json, content: { application/zip: { schema: { type: string, format: binary } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/AuthenticationRequired' }
+        '403': { $ref: '#/components/responses/AuthorizationMutationForbidden' }
+  /health/incidents:
+    get:
+      operationId: listHealthIncidents
+      description: Lists durable provider health incident groups visible through the caller's instances.read scopes. Related sources remain attached to one stable group.
+      parameters:
+        - { name: instanceId, in: query, schema: { type: array, maxItems: 100, items: { type: string, format: uuid } } }
+        - { name: includeResolved, in: query, schema: { type: boolean, default: false } }
+      responses:
+        '200': { description: Scoped health incident groups and preserved source details, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/HealthIncident' } } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/AuthenticationRequired' }
+        '403': { $ref: '#/components/responses/AccessDenied' }
+  /health/incidents/{incidentId}/acknowledgement:
+    parameters: [{ name: incidentId, in: path, required: true, schema: { type: string, format: uuid } }]
+    put:
+      operationId: setHealthIncidentAcknowledgement
+      description: Acknowledges or unacknowledges one incident after enforcing tasks.execute against its current instance-group scope.
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/SetHealthAcknowledgement' } } } }
+      responses:
+        '200': { description: Updated health incident, content: { application/json: { schema: { $ref: '#/components/schemas/HealthIncident' } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/AuthenticationRequired' }
+        '403': { $ref: '#/components/responses/AuthorizationMutationForbidden' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /health/incidents/{incidentId}/snooze:
+    parameters: [{ name: incidentId, in: path, required: true, schema: { type: string, format: uuid } }]
+    put:
+      operationId: setHealthIncidentSnooze
+      description: Snoozes an incident for at most 30 days, or clears its snooze with null, after scoped tasks.execute authorization.
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/SetHealthSnooze' } } } }
+      responses:
+        '200': { description: Updated health incident, content: { application/json: { schema: { $ref: '#/components/schemas/HealthIncident' } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/AuthenticationRequired' }
+        '403': { $ref: '#/components/responses/AuthorizationMutationForbidden' }
+        '404': { $ref: '#/components/responses/Problem' }
   /operations/search:
     post:
       operationId: startSearchOperation
-      parameters: [{ name: Idempotency-Key, in: header, required: true, schema: { type: string, maxLength: 128 } }]
-      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [targets], properties: { targets: { type: array, maxItems: 10000, items: { type: string, format: uuid } }, dryRun: { type: boolean, default: false } } } } } }
-      responses: { '202': { description: Operation accepted }, '409': { $ref: '#/components/responses/Problem' } }
+      parameters:
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string, minLength: 1, maxLength: 128 } }
+        - { $ref: '#/components/parameters/CsrfToken' }
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/SearchRequest' } } } }
+      responses:
+        '202': { description: Search or dry-run operation accepted/replayed, content: { application/json: { schema: { $ref: '#/components/schemas/Operation' } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/AuthenticationRequired' }
+        '403': { $ref: '#/components/responses/AuthorizationMutationForbidden' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /operations/search/preview:
+    post:
+      operationId: previewSearchOperation
+      description: Resolves a selected/instance/group/all scope against current authorization and currently available missing items without creating an operation.
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/SearchRequest' } } } }
+      responses:
+        '200': { description: Explicit resolved target preview, content: { application/json: { schema: { $ref: '#/components/schemas/SearchScopePreview' } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/AuthenticationRequired' }
+        '403': { $ref: '#/components/responses/AccessDenied' }
   /operations/{operationId}:
     get:
       operationId: getOperation
       parameters: [{ name: operationId, in: path, required: true, schema: { type: string, format: uuid } }]
-      responses: { '200': { description: Operation and per-target outcomes }, '404': { $ref: '#/components/responses/Problem' } }
+      responses:
+        '200': { description: Actor-owned operation and per-target outcomes, content: { application/json: { schema: { $ref: '#/components/schemas/Operation' } } } }
+        '401': { $ref: '#/components/responses/AuthenticationRequired' }
+        '404': { $ref: '#/components/responses/Problem' }
+    delete:
+      operationId: cancelOperation
+      parameters:
+        - { name: operationId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { $ref: '#/components/parameters/CsrfToken' }
+      responses:
+        '202': { description: Cancellation requested or terminal operation acknowledged, content: { application/json: { schema: { $ref: '#/components/schemas/Operation' } } } }
+        '401': { $ref: '#/components/responses/AuthenticationRequired' }
+        '403': { $ref: '#/components/responses/AuthorizationMutationForbidden' }
+        '404': { $ref: '#/components/responses/Problem' }
 components:
   securitySchemes:
-    cookieAuth: { type: apiKey, in: cookie, name: arrcontrol_session }
+    cookieAuth: { type: apiKey, in: cookie, name: __Host-arrcontrol_session, description: Short-lived opaque access token in a Secure, host-only, Path=/, HttpOnly, SameSite cookie. }
+    refreshCookie: { type: apiKey, in: cookie, name: __Host-arrcontrol_refresh, description: Rotating opaque refresh token in a Secure, host-only, Path=/, HttpOnly, SameSite cookie. }
   parameters:
     InstanceId: { name: instanceId, in: path, required: true, schema: { type: string, format: uuid } }
+    InstanceGroupId: { name: instanceGroupId, in: path, required: true, schema: { type: string, format: uuid } }
+    CredentialPurpose: { name: purpose, in: path, required: true, schema: { $ref: '#/components/schemas/CredentialPurpose' } }
+    RoleId: { name: roleId, in: path, required: true, schema: { type: string, format: uuid } }
+    UserId: { name: userId, in: path, required: true, schema: { type: string, format: uuid } }
+    CsrfToken: { name: X-CSRF-Token, in: header, required: true, description: Must exactly match the __Host-arrcontrol_csrf cookie., schema: { type: string, minLength: 43, maxLength: 43 } }
   responses:
     Problem: { description: RFC 9457 problem details, content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } } }
+    AuthenticationRequired: { description: 'Authentication is required (`authentication_required`).', content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } } }
+    AccessDenied: { description: 'The effective authorization does not grant access (`access_denied`).', content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } } }
+    AuthorizationMutationForbidden: { description: 'Access is denied (`access_denied`) or CSRF validation failed (`csrf_validation_failed`).', content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } } }
+    InvalidAuthorizationRequest: { description: 'The request is malformed or fails authorization validation (`invalid_request`, `role_id_invalid`, `role_name_invalid`, `role_permissions_invalid`, `user_id_invalid`, or `role_assignments_invalid`).', content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } } }
+    RoleNotFound: { description: 'The role does not exist (`role_not_found`).', content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } } }
+    UserNotFound: { description: 'The user does not exist (`user_not_found`).', content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } } }
+    AssignmentReferenceNotFound: { description: 'The user, role, or instance group does not exist (`user_not_found`, `role_not_found`, or `instance_group_not_found`).', content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } } }
+    RoleMutationConflict: { description: 'A role name is already used, a system role is immutable, or the change would remove the last global manager (`role_name_conflict`, `system_role_immutable`, or `authorization_lockout`).', content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } } }
+    AuthorizationLockout: { description: 'The change would remove the last active user with global authorization administration (`authorization_lockout`).', content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } } }
+    CredentialRequestInvalid: { description: 'The credential target, purpose, or secret is invalid (`credential_target_invalid`, `credential_purpose_invalid`, or `credential_secret_invalid`).', content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } } }
+    InstanceNotFound: { description: 'The instance does not exist or is outside the caller scope (`instance_not_found`).', content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } } }
+    CredentialEncryptionUnavailable: { description: 'No valid active credential encryption key is configured (`credential_encryption_unavailable`).', content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } } }
+    InstanceRequestInvalid: { description: 'The instance input or resolved outbound target is invalid or blocked (`instance_target_invalid`, `instance_name_invalid`, `instance_kind_invalid`, `instance_base_url_invalid`, `instance_group_name_invalid`, `outbound_target_invalid`, `outbound_dns_failed`, or `outbound_address_blocked`).', content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } } }
+    InstanceGroupNotFound: { description: 'The instance group does not exist (`instance_group_not_found`).', content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } } }
+    InstanceConflict: { description: 'The instance name or identifier is already used (`instance_conflict`).', content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } } }
   schemas:
     SystemStatus: { type: object, required: [name,status,utc], properties: { name: { const: ArrControl }, status: { enum: [ok,degraded] }, version: { type: string }, utc: { type: string, format: date-time } } }
-    Instance: { type: object, required: [id,name,kind,baseUrl,enabled], properties: { id: { type: string, format: uuid }, name: { type: string }, kind: { type: string }, baseUrl: { type: string, format: uri }, enabled: { type: boolean }, credentialsConfigured: { type: boolean } } }
-    CreateInstance: { type: object, additionalProperties: false, required: [name,kind,baseUrl,credential], properties: { name: { type: string, maxLength: 120 }, kind: { type: string }, baseUrl: { type: string, format: uri }, credential: { type: string, writeOnly: true } } }
-    Problem: { type: object, properties: { type: { type: string, format: uri-reference }, title: { type: string }, status: { type: integer }, detail: { type: string }, traceId: { type: string }, code: { type: string } } }
+    CsrfToken: { type: object, additionalProperties: false, required: [token], properties: { token: { type: string, minLength: 43, maxLength: 43 } } }
+    LocalLogin: { type: object, additionalProperties: false, required: [email,password], properties: { email: { type: string, format: email, maxLength: 320 }, password: { type: string, format: password, maxLength: 1024, writeOnly: true } } }
+    AuthSession: { type: object, additionalProperties: false, required: [userId,email,accessExpiresAt,refreshExpiresAt,csrfToken], properties: { userId: { type: string, format: uuid }, email: { type: string, format: email }, accessExpiresAt: { type: string, format: date-time }, refreshExpiresAt: { type: string, format: date-time }, csrfToken: { type: string, minLength: 43, maxLength: 43 } } }
+    OidcStatus: { type: object, additionalProperties: false, required: [enabled,loginUrl], properties: { enabled: { type: boolean }, loginUrl: { type: [string, 'null'], maxLength: 2048 } } }
+    PermissionCode: { type: string, enum: [instances.read,instances.manage,library.read,search.execute,queue.manage,tasks.execute,users.manage,audit.read,settings.manage,authorization.manage] }
+    PermissionDefinition: { type: object, additionalProperties: false, required: [code], properties: { code: { $ref: '#/components/schemas/PermissionCode' } } }
+    PermissionGrant:
+      type: object
+      additionalProperties: false
+      required: [code,global,instanceGroupIds]
+      properties:
+        code: { $ref: '#/components/schemas/PermissionCode' }
+        global: { type: boolean, description: When true, the grant applies globally and instanceGroupIds is empty. }
+        instanceGroupIds: { type: array, uniqueItems: true, items: { type: string, format: uuid }, description: Sorted instance-group scopes when global is false. }
+    CurrentAuthorization:
+      type: object
+      additionalProperties: false
+      required: [userId,email,authenticationMethod,locale,timeZone,permissions]
+      properties:
+        userId: { type: string, format: uuid }
+        email: { type: string, format: email }
+        authenticationMethod: { type: string, enum: [local,oidc] }
+        locale: { type: string, enum: [en,de] }
+        timeZone: { type: string, minLength: 1, maxLength: 128, description: IANA timezone identifier supported by the server. }
+        permissions: { type: array, items: { $ref: '#/components/schemas/PermissionGrant' }, description: Effective grants sorted by permission code. }
+    UpdateUserPreferences:
+      type: object
+      additionalProperties: false
+      required: [locale,timeZone]
+      properties:
+        locale: { type: string, enum: [en,de] }
+        timeZone: { type: string, minLength: 1, maxLength: 128 }
+    UserPreferences:
+      type: object
+      additionalProperties: false
+      required: [locale,timeZone]
+      properties:
+        locale: { type: string, enum: [en,de] }
+        timeZone: { type: string, minLength: 1, maxLength: 128 }
+    AuthorizationRole:
+      type: object
+      additionalProperties: false
+      required: [id,name,isSystem,permissions]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string, minLength: 1, maxLength: 120 }
+        isSystem: { type: boolean }
+        permissions: { type: array, uniqueItems: true, maxItems: 10, items: { $ref: '#/components/schemas/PermissionCode' }, description: Permission codes sorted ordinally. }
+    UpsertAuthorizationRole:
+      type: object
+      additionalProperties: false
+      required: [name,permissions]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        permissions: { type: array, uniqueItems: true, maxItems: 10, items: { $ref: '#/components/schemas/PermissionCode' } }
+    AuthorizationUser:
+      type: object
+      additionalProperties: false
+      required: [userId,email,state]
+      properties:
+        userId: { type: string, format: uuid }
+        email: { type: string, format: email }
+        state: { type: string, maxLength: 32 }
+    RoleAssignmentInput:
+      type: object
+      additionalProperties: false
+      required: [roleId,instanceGroupId]
+      properties:
+        roleId: { type: string, format: uuid }
+        instanceGroupId: { type: [string, 'null'], format: uuid, description: Null assigns the role globally. }
+    ReplaceRoleAssignments:
+      type: object
+      additionalProperties: false
+      required: [assignments]
+      properties:
+        assignments: { type: array, uniqueItems: true, maxItems: 256, items: { $ref: '#/components/schemas/RoleAssignmentInput' } }
+    RoleAssignment:
+      type: object
+      additionalProperties: false
+      required: [roleId,roleName,instanceGroupId]
+      properties:
+        roleId: { type: string, format: uuid }
+        roleName: { type: string, minLength: 1, maxLength: 120 }
+        instanceGroupId: { type: [string, 'null'], format: uuid }
+    InstanceGroupSummary:
+      type: object
+      additionalProperties: false
+      required: [id,name]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string, minLength: 1, maxLength: 120 }
+    CredentialPurpose: { type: string, enum: [api-key,username,password] }
+    WriteCredential:
+      type: object
+      additionalProperties: false
+      required: [secret]
+      properties:
+        secret: { type: string, minLength: 1, maxLength: 4096, writeOnly: true, description: Maximum is 4,096 UTF-8 bytes; the character limit is only an OpenAPI upper bound. }
+    CredentialMetadata:
+      type: object
+      additionalProperties: false
+      required: [purpose,configured,updatedAt]
+      properties:
+        purpose: { $ref: '#/components/schemas/CredentialPurpose' }
+        configured: { const: true }
+        updatedAt: { type: string, format: date-time }
+    InstanceKind: { type: string, enum: [bazarr,deluge,emby,jellyfin,jellyseerr,lidarr,nzbget,ombi,overseerr,plex,prowlarr,qbittorrent,radarr,readarr,sabnzbd,sonarr,transmission,whisparr], description: Configuration kinds are not a support claim; see the provider compatibility matrix for contract-tested adapters. }
+    InstanceSummary:
+      type: object
+      additionalProperties: false
+      required: [id,name,kind,baseUrl,enabled,instanceGroupId,tlsVerificationEnabled,allowPrivateNetworkAccess,credentialsConfigured,createdAt,updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string, minLength: 1, maxLength: 120 }
+        kind: { $ref: '#/components/schemas/InstanceKind' }
+        baseUrl: { type: string, format: uri, maxLength: 2048 }
+        enabled: { type: boolean }
+        instanceGroupId: { type: [string, 'null'], format: uuid }
+        tlsVerificationEnabled: { type: boolean }
+        allowPrivateNetworkAccess: { type: boolean }
+        credentialsConfigured: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    ProviderCapability:
+      type: object
+      additionalProperties: false
+      required: [capability,supported,observedAt]
+      properties:
+        capability: { type: string, minLength: 1, maxLength: 64 }
+        supported: { type: boolean }
+        observedAt: { type: string, format: date-time }
+    InstanceDetails:
+      type: object
+      additionalProperties: false
+      required: [id,name,kind,baseUrl,enabled,instanceGroupId,tlsVerificationEnabled,allowPrivateNetworkAccess,capabilities,createdAt,updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string, minLength: 1, maxLength: 120 }
+        kind: { $ref: '#/components/schemas/InstanceKind' }
+        baseUrl: { type: string, format: uri, maxLength: 2048 }
+        enabled: { type: boolean }
+        instanceGroupId: { type: [string, 'null'], format: uuid }
+        tlsVerificationEnabled: { type: boolean }
+        allowPrivateNetworkAccess: { type: boolean }
+        capabilities: { type: array, items: { $ref: '#/components/schemas/ProviderCapability' } }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    WriteInstance:
+      type: object
+      additionalProperties: false
+      required: [name,kind,baseUrl]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        kind: { $ref: '#/components/schemas/InstanceKind' }
+        baseUrl: { type: string, format: uri, maxLength: 2048, description: Absolute HTTP(S) URL without credentials, query, or fragment. }
+        enabled: { type: boolean, default: true }
+        instanceGroupId: { type: [string, 'null'], format: uuid }
+        tlsVerificationEnabled: { type: boolean, default: true, description: Disabling verification is an explicit high-risk exception. }
+        allowPrivateNetworkAccess: { type: boolean, default: false, description: Explicitly permits RFC1918 or IPv6 ULA targets; special/link-local/loopback ranges remain blocked. }
+    ConnectionProbe:
+      type: object
+      additionalProperties: false
+      required: [connected,outcome,httpStatusCode,observedAt,capabilities,providerVersion,healthIssues,rateLimit]
+      properties:
+        connected: { type: boolean }
+        outcome: { type: string, enum: [connected,connection_timeout,tls_validation_failed,connection_failed,credential_missing,unreachable,tls_error,unauthorized,forbidden,rate_limited,unsupported_version,invalid_response,upstream_conflict,not_found,timeout,unknown] }
+        httpStatusCode: { type: [integer, 'null'], minimum: 100, maximum: 599 }
+        observedAt: { type: string, format: date-time }
+        capabilities: { type: array, items: { $ref: '#/components/schemas/ProviderCapability' } }
+        providerVersion: { type: [string, 'null'], maxLength: 64 }
+        healthIssues: { type: ['array', 'null'], items: { $ref: '#/components/schemas/ProviderHealthIssue' } }
+        rateLimit: { oneOf: [{ $ref: '#/components/schemas/ProviderRateLimit' }, { type: 'null' }] }
+    ProviderHealthIssue:
+      type: object
+      additionalProperties: false
+      required: [id,source,severity,message,wikiUrl]
+      properties:
+        id: { type: integer, format: int32 }
+        source: { type: string, minLength: 1 }
+        severity: { type: string, enum: [ok,notice,warning,error,unknown] }
+        message: { type: [string, 'null'] }
+        wikiUrl: { type: [string, 'null'], format: uri }
+    ProviderRateLimit:
+      type: object
+      additionalProperties: false
+      required: [limit,remaining,resetAt,retryAfter]
+      properties:
+        limit: { type: [integer, 'null'], minimum: 0 }
+        remaining: { type: [integer, 'null'], minimum: 0 }
+        resetAt: { type: [string, 'null'], format: date-time }
+        retryAfter: { type: [string, 'null'], description: Invariant .NET TimeSpan value, for example `00:00:20`. }
+    WriteInstanceGroup: { type: object, additionalProperties: false, required: [name], properties: { name: { type: string, minLength: 1, maxLength: 120 } } }
+    InstanceGroupDetails:
+      type: object
+      additionalProperties: false
+      required: [id,name,createdAt,updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string, minLength: 1, maxLength: 120 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    MissingKind: { type: string, enum: [movie,episode,album,book] }
+    MissingReason: { type: string, enum: [missing,not_available] }
+    MissingFilter:
+      type: object
+      additionalProperties: false
+      required: [instanceIds,kinds,reasons,search]
+      properties:
+        instanceIds: { type: array, uniqueItems: true, maxItems: 100, items: { type: string, format: uuid } }
+        kinds: { type: array, uniqueItems: true, items: { $ref: '#/components/schemas/MissingKind' } }
+        reasons: { type: array, uniqueItems: true, minItems: 1, items: { $ref: '#/components/schemas/MissingReason' } }
+        search: { type: [string, 'null'], maxLength: 200 }
+    WriteMissingSavedView:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        instanceIds: { type: array, uniqueItems: true, maxItems: 100, items: { type: string, format: uuid } }
+        kinds: { type: array, uniqueItems: true, items: { $ref: '#/components/schemas/MissingKind' } }
+        reasons: { type: array, uniqueItems: true, minItems: 1, items: { $ref: '#/components/schemas/MissingReason' }, default: [missing] }
+        search: { type: [string, 'null'], maxLength: 200 }
+    MissingSavedView:
+      type: object
+      additionalProperties: false
+      required: [id,name,filter,createdAt,updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string, minLength: 1, maxLength: 120 }
+        filter: { $ref: '#/components/schemas/MissingFilter' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    MissingItem:
+      type: object
+      additionalProperties: false
+      required: [id,instanceId,instanceName,providerKind,providerKey,kind,title,year,seasonNumber,episodeNumber,reason,availableAt,sourceAddedAt,externalIds,firstSeenAt,updatedAt,observedAt,stale]
+      properties:
+        id: { type: string, format: uuid }
+        instanceId: { type: string, format: uuid }
+        instanceName: { type: string }
+        providerKind: { type: string, enum: [sonarr,radarr,lidarr,readarr,whisparr] }
+        providerKey: { type: string, maxLength: 200 }
+        kind: { $ref: '#/components/schemas/MissingKind' }
+        title: { type: string, maxLength: 1000 }
+        year: { type: [integer, 'null'], minimum: 1 }
+        seasonNumber: { type: [integer, 'null'], minimum: 0 }
+        episodeNumber: { type: [integer, 'null'], minimum: 0 }
+        reason: { $ref: '#/components/schemas/MissingReason' }
+        availableAt: { type: [string, 'null'], format: date-time }
+        sourceAddedAt: { type: [string, 'null'], format: date-time }
+        externalIds: { type: object, additionalProperties: { type: string } }
+        firstSeenAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        observedAt: { type: [string, 'null'], format: date-time }
+        stale: { type: boolean }
+    MissingFreshness:
+      type: object
+      additionalProperties: false
+      required: [instanceId,observedAt,stale]
+      properties:
+        instanceId: { type: string, format: uuid }
+        observedAt: { type: [string, 'null'], format: date-time }
+        stale: { type: boolean }
+    MissingPage:
+      type: object
+      additionalProperties: false
+      required: [items,nextCursor,freshness]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/MissingItem' } }
+        nextCursor: { type: [string, 'null'] }
+        freshness: { type: array, items: { $ref: '#/components/schemas/MissingFreshness' } }
+    AggregatedQueueItem:
+      type: object
+      additionalProperties: false
+      required: [instanceId,instanceName,providerKind,providerKey,mediaProviderKey,title,status,trackedStatus,trackedState,protocol,sizeBytes,remainingBytes,addedAt,estimatedCompletionAt,downloadClient,indexer,correlatedHistoryCount,latestHistoryEvent,importFailure,observedAt,stale]
+      properties:
+        instanceId: { type: string, format: uuid }
+        instanceName: { type: string }
+        providerKind: { type: string, enum: [sonarr,radarr,lidarr,readarr,whisparr,prowlarr,sabnzbd,nzbget,qbittorrent,transmission,deluge] }
+        providerKey: { type: string }
+        mediaProviderKey: { type: [string, 'null'] }
+        title: { type: string }
+        status: { type: string }
+        trackedStatus: { type: string }
+        trackedState: { type: string }
+        protocol: { type: [string, 'null'] }
+        sizeBytes: { type: integer, format: int64, minimum: 0 }
+        remainingBytes: { type: integer, format: int64, minimum: 0 }
+        addedAt: { type: [string, 'null'], format: date-time }
+        estimatedCompletionAt: { type: [string, 'null'], format: date-time }
+        downloadClient: { type: [string, 'null'] }
+        indexer: { type: [string, 'null'] }
+        correlatedHistoryCount: { type: integer, minimum: 0 }
+        latestHistoryEvent: { type: [string, 'null'] }
+        importFailure: { oneOf: [{ $ref: '#/components/schemas/ImportFailureClassification' }, { type: 'null' }] }
+        observedAt: { type: string, format: date-time }
+        stale: { type: boolean }
+    AggregatedHistoryItem:
+      type: object
+      additionalProperties: false
+      required: [instanceId,instanceName,providerKind,providerKey,mediaProviderKey,title,eventType,eventAt,queueCorrelated,importFailure,observedAt,stale]
+      properties:
+        instanceId: { type: string, format: uuid }
+        instanceName: { type: string }
+        providerKind: { type: string, enum: [sonarr,radarr,lidarr,readarr,whisparr,prowlarr,sabnzbd,nzbget,qbittorrent,transmission,deluge] }
+        providerKey: { type: string }
+        mediaProviderKey: { type: [string, 'null'] }
+        title: { type: string }
+        eventType: { type: string }
+        eventAt: { type: string, format: date-time }
+        queueCorrelated: { type: boolean }
+        importFailure: { oneOf: [{ $ref: '#/components/schemas/ImportFailureClassification' }, { type: 'null' }] }
+        observedAt: { type: string, format: date-time }
+        stale: { type: boolean }
+    ImportFailureClassification:
+      type: object
+      additionalProperties: false
+      required: [category,severity,ruleId,guidanceKey,retrySupported]
+      properties:
+        category: { type: string, enum: [download_client_unavailable,import_blocked,import_failed,import_retry_pending,upstream_error,import_pending,download_failed,download_ignored] }
+        severity: { type: string, enum: [warning,error] }
+        ruleId: { type: string }
+        guidanceKey: { type: string, description: Localization key; the API does not synthesize a diagnosis from free text. }
+        retrySupported: { const: false, description: Remains false until a safe provider retry contract is implemented and tested. }
+    HealthIncidentSource:
+      type: object
+      additionalProperties: false
+      required: [providerIssueId,source,severity,message,remediationUrl,firstSeenAt,lastSeenAt,active]
+      properties:
+        providerIssueId: { type: integer, format: int32 }
+        source: { type: string, maxLength: 300 }
+        severity: { type: string, enum: [ok,notice,warning,error,unknown] }
+        message: { type: [string, 'null'], maxLength: 4000, description: Bounded raw source diagnostic; never included in audit summaries or default logs. }
+        remediationUrl: { type: [string, 'null'], format: uri, maxLength: 2048, description: Provider-supplied HTTP(S) remediation link. }
+        firstSeenAt: { type: string, format: date-time }
+        lastSeenAt: { type: string, format: date-time }
+        active: { type: boolean }
+    HealthIncident:
+      type: object
+      additionalProperties: false
+      required: [id,instanceId,instanceName,providerKind,severity,remediationUrl,firstSeenAt,lastSeenAt,resolvedAt,acknowledgedAt,acknowledgedByUserId,snoozedUntil,snoozedByUserId,stale,sources]
+      properties:
+        id: { type: string, format: uuid }
+        instanceId: { type: string, format: uuid }
+        instanceName: { type: string }
+        providerKind: { type: string, enum: [sonarr,radarr,lidarr,readarr,whisparr,prowlarr,bazarr,sabnzbd,nzbget,qbittorrent,transmission,deluge,plex,jellyfin,emby,overseerr,jellyseerr,ombi] }
+        severity: { type: string, enum: [ok,notice,warning,error,unknown] }
+        remediationUrl: { type: [string, 'null'], format: uri, maxLength: 2048 }
+        firstSeenAt: { type: string, format: date-time }
+        lastSeenAt: { type: string, format: date-time }
+        resolvedAt: { type: [string, 'null'], format: date-time }
+        acknowledgedAt: { type: [string, 'null'], format: date-time }
+        acknowledgedByUserId: { type: [string, 'null'], format: uuid }
+        snoozedUntil: { type: [string, 'null'], format: date-time }
+        snoozedByUserId: { type: [string, 'null'], format: uuid }
+        stale: { type: boolean }
+        sources: { type: array, minItems: 1, maxItems: 1000, items: { $ref: '#/components/schemas/HealthIncidentSource' } }
+    SetHealthAcknowledgement:
+      type: object
+      additionalProperties: false
+      required: [acknowledged]
+      properties: { acknowledged: { type: boolean } }
+    SetHealthSnooze:
+      type: object
+      additionalProperties: false
+      required: [snoozedUntil]
+      properties: { snoozedUntil: { type: [string, 'null'], format: date-time, description: Future UTC timestamp no more than 30 days away; null clears the snooze. } }
+    LiveSnapshot:
+      type: object
+      additionalProperties: false
+      required: [version,cursor,generatedAt,resources]
+      properties:
+        version: { const: 1 }
+        cursor: { type: string, maxLength: 64, description: Opaque publication waterline; `origin` when no event has been published. }
+        generatedAt: { type: string, format: date-time }
+        resources: { type: array, uniqueItems: true, items: { type: string, pattern: '^/api/v1/' }, description: Authorized REST projections to reload before streaming from cursor. }
+    LiveEvent:
+      type: object
+      additionalProperties: false
+      required: [id,type,resource,occurredAt,instanceIds]
+      properties:
+        id: { type: string, format: uuid }
+        type: { type: string, pattern: '^[a-z]+\\.changed$' }
+        resource: { type: string, enum: [instances,missing,activity,health,operations,audit] }
+        occurredAt: { type: string, format: date-time }
+        instanceIds: { type: array, uniqueItems: true, items: { type: string, format: uuid }, description: IDs already filtered to the current caller scope; empty for actor/global events. }
+    AuditEvent:
+      type: object
+      additionalProperties: false
+      required: [id,occurredAt,actorUserId,actorType,actorIdentifier,action,scope,correlationId,outcome,summary,ipAddress]
+      properties:
+        id: { type: string, format: uuid }
+        occurredAt: { type: string, format: date-time }
+        actorUserId: { type: [string, 'null'], format: uuid }
+        actorType: { type: string, maxLength: 32 }
+        actorIdentifier: { type: string, maxLength: 320 }
+        action: { type: string, maxLength: 160 }
+        scope: { type: object, additionalProperties: true, description: Already-redacted structured audit scope. }
+        correlationId: { type: string, maxLength: 128 }
+        outcome: { type: string, maxLength: 32 }
+        summary: { type: object, additionalProperties: true, description: Already-redacted structured audit summary; credentials are forbidden at write time. }
+        ipAddress: { type: [string, 'null'], description: Source address captured after trusted-proxy processing. }
+    AuditPage:
+      type: object
+      additionalProperties: false
+      required: [items,nextCursor]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/AuditEvent' } }
+        nextCursor: { type: [string, 'null'], maxLength: 4096 }
+    DiagnosticsExportRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        lookbackHours: { type: integer, minimum: 1, maximum: 168, default: 24 }
+        includeAudit: { type: boolean, default: true }
+    OperationState: { type: string, enum: [pending,running,succeeded,partial,failed,cancelled] }
+    OperationTargetState: { type: string, enum: [pending,running,succeeded,failed,cancelled,skipped] }
+    OperationTarget:
+      type: object
+      additionalProperties: false
+      required: [instanceId,targetKey,state,errorCode,resultJson,startedAt,completedAt]
+      properties:
+        instanceId: { type: string, format: uuid }
+        targetKey: { type: string, maxLength: 200 }
+        state: { $ref: '#/components/schemas/OperationTargetState' }
+        errorCode: { type: [string, 'null'], maxLength: 128 }
+        resultJson: { type: [string, 'null'], description: Bounded provider-independent result JSON serialized as a string. }
+        startedAt: { type: [string, 'null'], format: date-time }
+        completedAt: { type: [string, 'null'], format: date-time }
+    Operation:
+      type: object
+      additionalProperties: false
+      required: [id,type,state,dryRun,cancellationRequested,createdAt,startedAt,completedAt,targets]
+      properties:
+        id: { type: string, format: uuid }
+        type: { type: string, maxLength: 64 }
+        state: { $ref: '#/components/schemas/OperationState' }
+        dryRun: { type: boolean }
+        cancellationRequested: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        startedAt: { type: [string, 'null'], format: date-time }
+        completedAt: { type: [string, 'null'], format: date-time }
+        targets: { type: array, maxItems: 10000, items: { $ref: '#/components/schemas/OperationTarget' } }
+    SearchScopeMode: { type: string, enum: [selected,instance,group,all] }
+    SearchRequest:
+      type: object
+      additionalProperties: false
+      required: [mode]
+      properties:
+        mode: { $ref: '#/components/schemas/SearchScopeMode' }
+        mediaEntityIds: { type: array, uniqueItems: true, maxItems: 10000, items: { type: string, format: uuid } }
+        instanceIds: { type: array, uniqueItems: true, maxItems: 100, items: { type: string, format: uuid } }
+        instanceGroupIds: { type: array, uniqueItems: true, maxItems: 100, items: { type: string, format: uuid } }
+        dryRun: { type: boolean, default: false }
+    SearchResolvedTarget:
+      type: object
+      additionalProperties: false
+      required: [instanceId,providerKind,providerKey]
+      properties:
+        instanceId: { type: string, format: uuid }
+        providerKind: { type: string, enum: [sonarr,radarr,lidarr,readarr,whisparr] }
+        providerKey: { type: string, maxLength: 200 }
+    SearchPreviewInstance:
+      type: object
+      additionalProperties: false
+      required: [instanceId,providerKind,targetCount]
+      properties:
+        instanceId: { type: string, format: uuid }
+        providerKind: { type: string, enum: [sonarr,radarr,lidarr,readarr,whisparr] }
+        targetCount: { type: integer, minimum: 1 }
+    SearchScopePreview:
+      type: object
+      additionalProperties: false
+      required: [mode,targetCount,excludedCount,instances,targets]
+      properties:
+        mode: { $ref: '#/components/schemas/SearchScopeMode' }
+        targetCount: { type: integer, minimum: 0, maximum: 10000 }
+        excludedCount: { type: integer, minimum: 0 }
+        instances: { type: array, items: { $ref: '#/components/schemas/SearchPreviewInstance' } }
+        targets: { type: array, maxItems: 10000, items: { $ref: '#/components/schemas/SearchResolvedTarget' } }
+    Problem: { type: object, additionalProperties: false, required: [type,title,status,code,traceId], properties: { type: { type: string, format: uri-reference }, title: { type: string }, status: { type: integer }, detail: { type: string }, traceId: { type: string }, code: { type: string } } }

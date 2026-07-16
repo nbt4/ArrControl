@@ -1,1 +1,14 @@
-{"name":"arrcontrol","private":true,"packageManager":"pnpm@10.12.1","scripts":{"dev":"pnpm --filter @arrcontrol/web dev","build":"pnpm --filter @arrcontrol/web build","test":"pnpm --filter @arrcontrol/web test","lint":"pnpm --filter @arrcontrol/web lint"}}
+{
+  "name": "arrcontrol",
+  "private": true,
+  "packageManager": "pnpm@10.12.1",
+  "scripts": {
+    "dev": "pnpm --filter @arrcontrol/web dev",
+    "generate:api": "pnpm --filter @arrcontrol/web generate:api",
+    "check:api": "pnpm --filter @arrcontrol/web check:api",
+    "build": "pnpm --filter @arrcontrol/web build",
+    "test": "pnpm --filter @arrcontrol/web test",
+    "test:e2e": "pnpm --filter @arrcontrol/web test:e2e",
+    "lint": "pnpm --filter @arrcontrol/web lint"
+  }
+}

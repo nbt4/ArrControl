@@ -1,0 +1,4 @@
+[
+  { "id": 101, "seriesId": 42, "tvdbId": 42001, "seasonNumber": 1, "episodeNumber": 1, "absoluteEpisodeNumber": 1, "title": "Pilot", "airDateUtc": "2025-01-01T20:00:00Z", "monitored": true, "hasFile": true },
+  { "id": 102, "seriesId": 42, "tvdbId": 42002, "seasonNumber": 1, "episodeNumber": 2, "absoluteEpisodeNumber": 2, "title": "Second", "airDateUtc": "2026-08-01T20:00:00Z", "monitored": true, "hasFile": false }
+]

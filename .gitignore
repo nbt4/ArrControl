@@ -2,12 +2,16 @@
 **/bin/
 **/obj/
 **/node_modules/
+.pnpm-store/
 **/dist/
+**/test-results/
 **/*.tsbuildinfo
 .idea/
 .vscode/
 coverage/
 artifacts/
+secrets/
 *.user
 *.suo
 *.log
+Caddyfile.local

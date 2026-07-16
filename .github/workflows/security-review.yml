@@ -1,0 +1,73 @@
+name: security-review
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: '17 2 * * 3'
+
+concurrency:
+  group: security-review-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  zap-baseline:
+    name: OWASP ZAP passive baseline
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+      - name: Build review image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: deploy/Dockerfile
+          load: true
+          push: false
+          tags: arrcontrol:security-review
+      - name: Run passive dynamic review
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/zap
+          chmod 0777 artifacts/zap
+          docker network create arrcontrol-security-review
+          cleanup() {
+            docker rm --force arrcontrol-security-review-app >/dev/null 2>&1 || true
+            docker network rm arrcontrol-security-review >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+          docker run --detach --name arrcontrol-security-review-app \
+            --network arrcontrol-security-review \
+            --read-only --tmpfs /tmp:rw,noexec,nosuid,size=64m \
+            --env ASPNETCORE_URLS=http://+:8080 \
+            --env ConnectionStrings__Database='Host=127.0.0.1;Database=unavailable' \
+            arrcontrol:security-review
+          for attempt in {1..30}; do
+            if docker run --rm --network arrcontrol-security-review \
+              curlimages/curl@sha256:935d9100e9ba842cdb060de42472c7ca90cfe9a7c96e4dacb55e79e560b3ff40 \
+              --fail --silent http://arrcontrol-security-review-app:8080/health/live >/dev/null; then
+              break
+            fi
+            test "${attempt}" -lt 30
+            sleep 1
+          done
+          docker run --rm --network arrcontrol-security-review \
+            --volume "${PWD}/artifacts/zap:/zap/wrk:rw" \
+            ghcr.io/zaproxy/zaproxy@sha256:8d387b1a63e3425beef4846e39719f5af2a787753af2d8b6558c6257d7a577a2 \
+            zap-baseline.py -t http://arrcontrol-security-review-app:8080 \
+            -m 1 -I -r zap.html -J zap.json
+      - name: Upload ZAP report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: zap-security-review
+          path: artifacts/zap/
+          if-no-files-found: error
+          retention-days: 30

@@ -1,0 +1,93 @@
+export const en = {
+  app: {
+    brand: 'ArrControl',
+    skipToContent: 'Skip to main content',
+    navigation: {
+      label: 'Primary navigation', overview: 'Overview', library: 'Library', missing: 'Missing',
+      queue: 'Queue', history: 'History', health: 'Health', audit: 'Audit', settings: 'Settings',
+    },
+    liveApi: 'Live API data',
+  },
+  preferences: {
+    language: 'Language', timezone: 'Timezone', save: 'Save preferences', saving: 'Saving…',
+    saved: 'Preferences saved.', failed: 'Preferences could not be saved.',
+    locale: { en: 'English', de: 'Deutsch' },
+  },
+  dashboard: {
+    eyebrow: 'OPERATIONS CENTER', title: 'ArrControl overview',
+    subtitle: 'Current state from the local API, without cached demo values.',
+    refresh: 'Refresh', observedAt: 'Observed {{date}}', summaryLabel: 'System summary',
+    metric: {
+      controlPlane: 'Control plane', online: 'Online', degraded: 'Degraded', apiVersion: 'API {{version}}',
+      services: 'Services', permissionRequired: 'Permission required', enabledCount: '{{count}} enabled',
+      credentials: 'Credentials', encryptedKeys: 'Encrypted provider keys', tlsExceptions: 'TLS exceptions',
+      verificationEnabled: 'Verification enabled', reviewRecommended: 'Review recommended',
+    },
+  },
+  auth: {
+    signedIn: 'SIGNED IN', signOut: 'Sign out', signOutFailed: 'Sign-out failed. Try again.',
+    required: 'AUTHENTICATION REQUIRED', title: 'Sign in to load your services',
+    secureCookies: 'Secure session cookies require HTTPS, including local development.',
+    email: 'Email', password: 'Password', signIn: 'Sign in',
+    failed: 'Sign-in failed. Check the credentials and HTTPS setup.',
+  },
+  instance: {
+    accessMissingTitle: 'Instance access is not assigned',
+    accessMissingBody: 'Your account is active, but it has no instances.read grant.',
+    emptyTitle: 'No services configured',
+    emptyBody: 'Use the instance API or an administrator account to add the first provider.',
+    enabled: 'Enabled', disabled: 'Disabled', keyConfigured: 'Key configured', keyMissing: 'Key missing',
+    tlsVerified: 'TLS verified', tlsBypass: 'TLS bypass',
+    addEyebrow: 'CONNECTIONS', addTitle: 'Add service',
+    addBody: 'Provider credentials are encrypted and never returned to the browser after saving.',
+    name: 'Name', kind: 'Provider', baseUrl: 'Base URL', apiKey: 'API key (optional)',
+    allowPrivateNetwork: 'Allow private-network target', add: 'Add service',
+    addFailed: 'The service could not be added. Check its URL and your permissions.',
+    probe: 'Test connection', probeConnected: 'Connected', probeFailed: 'Connection failed ({{outcome}})',
+    edit: 'Edit', save: 'Save service', verifyTls: 'Verify TLS certificate',
+    tlsWarning: 'TLS verification is disabled for this service. Use this only for a trusted self-signed local certificate.',
+    apiKeyReplace: 'Replace API key (leave blank to keep current key)',
+    deleteTitle: 'Remove service', deleteBody: 'Type {{name}} to permanently remove this service and its stored credentials.',
+    deleteConfirm: 'Service name', delete: 'Remove service',
+  },
+  missing: {
+    eyebrow: 'MISSING', title: 'Missing media', search: 'Filter titles', failed: 'Missing media could not be loaded.',
+    emptyTitle: 'No missing media', emptyBody: 'A completed provider synchronization has not reported any missing media.',
+    fresh: 'Fresh', stale: 'Stale',
+  },
+  queue: {
+    eyebrow: 'QUEUE', title: 'Current queue', failed: 'Queue data could not be loaded.', unknownProtocol: 'Unknown protocol',
+    emptyTitle: 'Queue is empty', emptyBody: 'No visible provider or download-client queue entries are currently projected.', fresh: 'Fresh', stale: 'Stale',
+  },
+  history: {
+    eyebrow: 'HISTORY', title: 'Recent activity', failed: 'History could not be loaded.',
+    emptyTitle: 'No recent activity', emptyBody: 'No visible provider activity has been projected yet.', fresh: 'Fresh', stale: 'Stale',
+  },
+  import: {
+    guidance: {
+      check_download_client: 'Check the configured download client and its connection.',
+      review_upstream_import: 'Review the import details in the source provider.',
+      wait_or_review_upstream: 'Wait for the pending import or review it in the source provider.',
+      review_upstream: 'Review the diagnostic state in the source provider.',
+      search_again: 'Review the failed download before starting another search.',
+    },
+  },
+  health: {
+    eyebrow: 'HEALTH', title: 'Active incidents', activeCount: '{{count}} active',
+    emptyTitle: 'No active incidents', emptyBody: 'The latest provider health snapshots report no issues.',
+    lastSeen: 'Last seen {{date}}', remediation: 'Open guidance', acknowledge: 'Acknowledge',
+    unacknowledge: 'Unacknowledge', snooze: 'Snooze 24 hours', unsnooze: 'Clear snooze',
+    sources: '{{count}} source(s)', actionFailed: 'The incident could not be updated.',
+    severity: { ok: 'OK', notice: 'Notice', warning: 'Warning', error: 'Error', unknown: 'Unknown' },
+  },
+  audit: {
+    eyebrow: 'AUDIT', title: 'Recent audit events', export: 'Export redacted diagnostics',
+    exportFailed: 'The diagnostics archive could not be created.', details: 'Redacted details',
+    emptyTitle: 'No recent audit events', emptyBody: 'No events match the default 30-day window.',
+  },
+  state: {
+    loadingTitle: 'Loading current state', loadingBody: 'Contacting the ArrControl API…',
+    errorTitle: 'API data is unavailable',
+    errorBody: 'No placeholder values are shown. Check readiness and try again.', retry: 'Try again',
+  },
+} as const;

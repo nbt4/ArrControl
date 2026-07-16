@@ -1,0 +1,11 @@
+{
+  "appName": "Sonarr",
+  "instanceName": "Sonarr",
+  "version": "4.0.1.1168",
+  "branch": "main",
+  "buildTime": "2023-11-30T00:00:00Z",
+  "isProduction": true,
+  "isDocker": true,
+  "urlBase": "/sonarr",
+  "migrationVersion": 205
+}
