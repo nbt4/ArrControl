@@ -67,7 +67,7 @@ Queue snapshots: current plus 30 days of transitions. Raw diagnostic payloads: d
 
 ## Migration policy
 
-Forward-only EF Core migrations, tested from the oldest supported version. Startup does not automatically run migrations in multi-replica production; `arrcontrol migrate` or a one-shot Compose job does. Destructive migrations require expand/migrate/contract phases.
+Forward-only EF Core migrations, tested from the oldest supported version. Startup applies pending migrations under a PostgreSQL advisory lock before HTTP or hosted services start, so multiple replicas serialize safely. `arrcontrol migrate` remains available for explicit operational runs. Destructive migrations require expand/migrate/contract phases.
 
 The initial migration creates the identity, connections, operations, outbox, and automation foundation. `audit_events` is partitioned by `occurred_at` with a default partition so inserts remain safe before rolling time partitions are introduced; audit updates are rejected while retention may delete expired rows.
 

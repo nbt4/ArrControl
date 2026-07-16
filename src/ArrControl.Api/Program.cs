@@ -101,6 +101,15 @@ if (migrationRequested)
     return;
 }
 
+var startupMigrationExitCode = await DatabaseMigrationCommand.RunAsync(
+    app.Services,
+    app.Logger,
+    app.Lifetime.ApplicationStopping);
+if (startupMigrationExitCode != 0)
+{
+    throw new InvalidOperationException("Database migration failed during application startup.");
+}
+
 app.UseForwardedHeaders();
 if (!app.Environment.IsDevelopment()) app.UseHsts();
 app.Use(async (context, next) =>

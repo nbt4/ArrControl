@@ -7,7 +7,7 @@
 5. English and German ship first; architecture supports more locales.
 6. MIT best matches “open source and free for everyone” and permits personal, commercial, modified, and redistributed use with attribution. The owner should confirm this legal choice before the first release.
 7. GitHub Container Registry is the canonical image registry and GitHub Actions is CI/CD.
-8. The first deployment serves SPA and API from one image on port 8080.
+8. The first deployment serves SPA and API from one image on configurable HTTP port 8080 by default.
 9. No external telemetry is enabled by default.
 10. Automated changes to upstream media/filesystems are conservative and capability-gated.
 

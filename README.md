@@ -22,8 +22,17 @@ Edit `.env` and replace both `CHANGE_ME` values with long random passwords. Set 
 ```bash
 mkdir -p /opt/docker/arrcontrol/secrets
 openssl rand -base64 32 > /opt/docker/arrcontrol/secrets/master-key
-chmod 600 /opt/docker/arrcontrol/secrets/master-key
+key_owner="$(docker run --rm --entrypoint /bin/sh nobentie/arrcontrol:1.0.0 -c 'printf "%s:%s" "$(id -u)" "$(id -g)"')"
+sudo chown "$key_owner" /opt/docker/arrcontrol/secrets/master-key
+sudo chmod 600 /opt/docker/arrcontrol/secrets/master-key
 ```
+
+ArrControl runs as an unprivileged user. On local Docker Compose installations,
+file-backed secrets may retain the source file owner and permissions when mounted
+into the container. The key must therefore be owned by the UID/GID used by the
+image as above; mode `0600` alone is not sufficient when the host owner is
+different. Do not make the key world-readable. If you pin a different ArrControl
+image version, substitute that same image reference in the `docker run` command.
 
 ### 3. Attach it to your existing Arr/proxy networks
 
@@ -36,19 +45,23 @@ docker network create starr
 
 If your networks use different names, change only the two external network names at the bottom of `compose.yaml`.
 
-### 4. Start the database, migrate once, then start ArrControl
+### 4. Start ArrControl
 
 ```bash
-docker compose up -d arrcontrol-db
-docker compose run --rm --no-deps arrcontrol database migrate
 docker compose up -d
 ```
+
+ArrControl applies pending database migrations during startup, after PostgreSQL is
+healthy. If a migration fails, ArrControl stays stopped; inspect its logs with
+`docker compose logs arrcontrol`.
 
 Use the pinned version in `.env` for normal operation. To test the newest build, set `ARRCONTROL_IMAGE=nobentie/arrcontrol:latest` and run `docker compose pull && docker compose up -d`.
 
 ### 5. Point your reverse proxy at ArrControl
 
-Your proxy must reach `http://arrcontrol:8080` over the shared `proxy` network. Example Caddy site:
+Your proxy must reach `http://arrcontrol:8080` over the shared `proxy` network by
+default. Set `ARRCONTROL_HTTP_PORT` in `.env` to use another container port, and
+use the same port in the proxy configuration. Example Caddy site:
 
 ```caddy
 arrcontrol.example.com {
@@ -65,7 +78,6 @@ For Arr containers behind Gluetun, use the Gluetun service name and its internal
 ```bash
 cd /opt/docker/arrcontrol
 docker compose pull
-docker compose run --rm --no-deps arrcontrol database migrate
 docker compose up -d
 ```
 

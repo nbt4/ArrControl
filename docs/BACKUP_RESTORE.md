@@ -17,7 +17,7 @@ Never write the dump, keys, or database password into the repository, CI artifac
 1. Provision an empty PostgreSQL 17 database and keep ArrControl stopped.
 2. Restore with `pg_restore --exit-on-error --no-owner --no-acl --dbname "$DATABASE_URL" arrcontrol.dump` using a protected environment/secret file, not a URL committed to shell history.
 3. Restore every referenced master-key version at its configured absolute path and restore the data-protection key ring with owner-only access.
-4. Run the target image's `database migrate` command exactly once; rerun is safe and proves idempotency.
+4. Start the target image. It applies pending migrations before serving HTTP; an explicit `database migrate` run is optional for operational verification and is safe to rerun.
 5. Start ArrControl, verify `/health/ready`, log in, inspect instance/credential configured flags, projection freshness, jobs, and audit continuity, then execute only read-only provider probes.
 6. Keep the old deployment and backup immutable until the observation window has passed.
 
@@ -25,6 +25,6 @@ If a key version is missing, do not delete or overwrite its credential rows: res
 
 ## Upgrade and rollback
 
-Before an upgrade, stop `arrcontrol`, take and restore-test the backup, pull the pinned target digest, run `docker compose run --rm --no-deps arrcontrol database migrate`, then start ArrControl. Verify readiness and the compatibility report before enabling broad operations. Database migrations are forward-only. Rollback means stop the target, discard its upgraded database, restore the pre-upgrade dump and matching keys, and restart the previous pinned image; never run EF down migrations against the only copy.
+Before an upgrade, stop `arrcontrol`, take and restore-test the backup, pull the pinned target digest, then start ArrControl. It applies pending migrations before serving HTTP. Verify readiness and the compatibility report before enabling broad operations. Database migrations are forward-only. Rollback means stop the target, discard its upgraded database, restore the pre-upgrade dump and matching keys, and restart the previous pinned image; never run EF down migrations against the only copy.
 
 `tests/data-lifecycle/run.sh` automates an isolated PostgreSQL 17 custom dump, listing, restore, current migration/idempotency, encrypted-credential-row preservation, and upgrade to the current schema. CI selects the latest earlier stable `vX.Y.Z` image when one exists. Before the first tagged stable image, it starts at the initial released schema migration instead, so the upgrade path remains exercised without inventing a previous image. The test uses generated ephemeral credentials and deletes its database/network; it never reads a deployment `.env` or persistent volume.

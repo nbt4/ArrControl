@@ -2,7 +2,7 @@
 
 ## Sign in and preferences
 
-Open ArrControl through its HTTPS address. Sign in with the local credentials supplied by an administrator or choose the configured Authentik/OIDC flow. Do not enter credentials on direct `http://...:8080`; secure browser sessions require HTTPS.
+Open ArrControl through its HTTPS address. Sign in with the local credentials supplied by an administrator or choose the configured Authentik/OIDC flow. Do not enter credentials on the direct HTTP listener (port `8080` by default); secure browser sessions require HTTPS.
 
 Use the language selector for English or German. Anonymous choices stay in that browser. After sign-in, your saved language and timezone take precedence and timestamps render in that timezone. If the locale changes but a timestamp seems wrong, verify the saved timezone rather than converting the displayed text manually.
 

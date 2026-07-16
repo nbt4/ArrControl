@@ -25,7 +25,7 @@ services:
       arrcontrol-db:
         condition: service_healthy
     environment:
-      ASPNETCORE_URLS: http://+:8080
+      ASPNETCORE_URLS: "http://+:${ARRCONTROL_HTTP_PORT:-8080}"
       ConnectionStrings__Database: Host=arrcontrol-db;Port=5432;Database=arrcontrol;Username=arrcontrol;Password=${ARRCONTROL_DB_PASSWORD}
       Bootstrap__AdminEmail: ${ARRCONTROL_ADMIN_EMAIL:?Set ARRCONTROL_ADMIN_EMAIL in .env}
       Bootstrap__AdminPassword: ${ARRCONTROL_ADMIN_PASSWORD:?Set ARRCONTROL_ADMIN_PASSWORD in .env}
@@ -35,7 +35,7 @@ services:
       CredentialEncryption__Keys__0__Path: /run/secrets/arrcontrol_master_key
       App__PublicUrl: ${ARRCONTROL_PUBLIC_URL:?Set ARRCONTROL_PUBLIC_URL in .env}
       DataProtection__KeysPath: /var/lib/arrcontrol/data-protection-keys
-    expose: ["8080"]
+    expose: ["${ARRCONTROL_HTTP_PORT:-8080}"]
     volumes:
       - ${ARRCONTROL_DATA_DIR}/data-protection:/var/lib/arrcontrol/data-protection-keys
     secrets: [arrcontrol_master_key]

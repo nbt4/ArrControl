@@ -15,7 +15,7 @@ public sealed class PendingMigrationsHealthCheckTests(AuthDatabaseFixture databa
     private const string InitialMigration = "20260714221653_InitialFoundation";
 
     [Fact]
-    public async Task Readiness_is_unhealthy_until_all_ef_migrations_are_applied()
+    public async Task Startup_applies_pending_ef_migrations_before_readiness_is_served()
     {
         var connectionString = await CreateSchemaAtInitialMigrationAsync();
         using var factory = new ReadinessApiFactory(connectionString);
@@ -24,27 +24,19 @@ public sealed class PendingMigrationsHealthCheckTests(AuthDatabaseFixture databa
             AllowAutoRedirect = false,
         });
 
-        using var pendingResponse = await client.GetAsync(
+        using var readinessResponse = await client.GetAsync(
             "/health/ready",
             CancellationToken.None);
 
-        Assert.Equal(HttpStatusCode.ServiceUnavailable, pendingResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, readinessResponse.StatusCode);
 
         var options = new DbContextOptionsBuilder<ArrControlDbContext>()
             .UseNpgsql(connectionString)
             .Options;
         await using (var migrationContext = new ArrControlDbContext(options))
         {
-            Assert.NotEmpty(await migrationContext.Database.GetPendingMigrationsAsync());
-            await migrationContext.Database.MigrateAsync(CancellationToken.None);
             Assert.Empty(await migrationContext.Database.GetPendingMigrationsAsync());
         }
-
-        using var currentResponse = await client.GetAsync(
-            "/health/ready",
-            CancellationToken.None);
-
-        Assert.Equal(HttpStatusCode.OK, currentResponse.StatusCode);
     }
 
     private async Task<string> CreateSchemaAtInitialMigrationAsync()
