@@ -87,7 +87,7 @@ Images support `linux/amd64` and `linux/arm64`.
 - [Administration and accounts](docs/ADMIN_GUIDE.md)
 - [Provider troubleshooting](docs/PROVIDER_TROUBLESHOOTING.md)
 - [Backup and recovery](docs/BACKUP_RESTORE.md)
-- [Developer and architecture reference](docs/README.md)
+- [Development](docs/DEVELOPMENT.md) and [architecture](docs/SDD.md)
 
 ## License
 
