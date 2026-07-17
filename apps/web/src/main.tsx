@@ -499,8 +499,8 @@ function AuthenticatedPanel({ canManage, email, instances, onChanged, onLogout }
 }
 
 const instanceKinds: readonly InstanceKind[] = [
-  'sonarr', 'radarr', 'lidarr', 'readarr', 'whisparr', 'prowlarr', 'bazarr', 'sabnzbd', 'nzbget',
-  'qbittorrent', 'transmission', 'deluge', 'plex', 'jellyfin', 'emby', 'overseerr', 'jellyseerr', 'ombi',
+  'sonarr', 'radarr', 'lidarr', 'readarr', 'whisparr', 'prowlarr', 'sabnzbd', 'nzbget',
+  'qbittorrent', 'transmission', 'deluge',
 ];
 
 function CreateInstanceForm({ onCreated }: { onCreated: () => void }) {

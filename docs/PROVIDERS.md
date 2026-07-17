@@ -2,6 +2,15 @@
 
 Operational diagnosis by stable outcome and provider family is in `docs/PROVIDER_TROUBLESHOOTING.md`.
 
+## Service selection in the web UI
+
+The service selector exposes only providers with a reachable operational view:
+Sonarr, Radarr, Lidarr, Readarr, Whisparr, Prowlarr, SABnzbd, NZBGet,
+qBittorrent, Transmission, and Deluge. The Arr providers supply catalog/missing
+items and search; Prowlarr and download clients supply queue/history data.
+Adapters for media servers, request managers, and Bazarr remain contract-tested
+but are not selectable until their data has a corresponding UI workflow.
+
 ## Contract
 
 Providers expose capability slices: `probe`, `library`, `missing`, `queue`, `history`, `search`, `grab`, `tasks`, `health`, `download-client`, `media-server`, `requests`, and `notifications`. Capability discovery controls UI and API actions. Every call has timeout, cancellation, typed errors, redacted logging, and rate-limit metadata.

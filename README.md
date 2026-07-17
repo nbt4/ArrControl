@@ -87,7 +87,7 @@ Back up both `${ARRCONTROL_DATA_DIR}/postgres` and `${ARRCONTROL_DATA_DIR}/data-
 
 | Tag | Intended use |
 | --- | --- |
-| `nobentie/arrcontrol:1.0.5` | Pinned production release |
+| `nobentie/arrcontrol:1.0.6` | Pinned production release |
 | `nobentie/arrcontrol:1.0` | Current 1.0 release line |
 | `nobentie/arrcontrol:latest` | Evaluation / newest release |
 
