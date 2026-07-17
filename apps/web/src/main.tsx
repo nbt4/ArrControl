@@ -84,7 +84,7 @@ function App() {
   const liveUserId = view.kind === 'ready' ? view.snapshot.authorization?.userId : null;
   const liveCursor = view.kind === 'ready' ? view.snapshot.liveCursor : null;
   useEffect(() => {
-    if (!liveUserId || !liveCursor) return undefined;
+    if (!liveUserId || !liveCursor || page === 'missing') return undefined;
     const source = new EventSource(`/api/v1/events?cursor=${encodeURIComponent(liveCursor)}`, {
       withCredentials: true,
     });
@@ -99,7 +99,7 @@ function App() {
       source.close();
       if (pendingRefresh !== undefined) window.clearTimeout(pendingRefresh);
     };
-  }, [liveCursor, liveUserId, refresh]);
+  }, [liveCursor, liveUserId, page, refresh]);
 
   const locale = normalizeLocale(i18n.resolvedLanguage);
   const authorization = view.kind === 'ready' ? view.snapshot.authorization : null;
@@ -229,6 +229,7 @@ function MissingScreen({ authorized, canSearch, initialInstanceId, instances }: 
   const [search, setSearch] = useState('');
   const [data, setData] = useState<MissingPage | null>(null);
   const [failed, setFailed] = useState(false);
+  const [syncRevision, setSyncRevision] = useState(0);
   const [selectedIds, setSelectedIds] = useState<readonly string[]>([]);
   const [preview, setPreview] = useState<{ request: SearchRequest; value: SearchScopePreview } | null>(null);
   const [searchState, setSearchState] = useState<'idle' | 'previewing' | 'starting' | 'failed' | 'started'>('idle');
@@ -244,7 +245,7 @@ function MissingScreen({ authorized, canSearch, initialInstanceId, instances }: 
       })
       .catch(() => { if (!controller.signal.aborted) setFailed(true); });
     return () => controller.abort();
-  }, [authorized, search, selectedInstance]);
+  }, [authorized, search, selectedInstance, syncRevision]);
   const toggle = (id: string) => setSelectedIds((current) => current.includes(id)
     ? current.filter((value) => value !== id) : [...current, id]);
   const requestPreview = async (request: SearchRequest) => {
@@ -267,12 +268,15 @@ function MissingScreen({ authorized, canSearch, initialInstanceId, instances }: 
     </div>
     <div className="missing-toolbar">
       <label className="search-field"><Search size={16} /><span className="sr-only">{t('missing.search')}</span><input onChange={(event) => setSearch(event.target.value)} placeholder={t('missing.search')} value={search} /></label>
-      {canSearch && <div className="missing-actions">
+      <div className="missing-actions">
+        <button className="secondary" disabled={searchState === 'previewing' || searchState === 'starting'} onClick={() => setSyncRevision((value) => value + 1)} type="button"><RefreshCw size={16} />{t('missing.sync')}</button>
+        {canSearch && <>
         <button className="secondary" disabled={searchState === 'previewing' || searchState === 'starting'} onClick={() => void requestPreview(selectedInstance
           ? { mode: 'instance', instanceIds: [selectedInstance.id], dryRun: false }
           : { mode: 'all', dryRun: false })} type="button"><Search size={16} />{selectedInstance ? t('missing.searchService') : t('missing.searchAll')}</button>
         <button disabled={selectedIds.length === 0 || searchState === 'previewing' || searchState === 'starting'} onClick={() => void requestPreview({ mode: 'selected', mediaEntityIds: [...selectedIds], dryRun: false })} type="button"><Search size={16} />{t('missing.searchSelected', { count: selectedIds.length })}</button>
-      </div>}
+        </>}
+      </div>
     </div>
     {!canSearch && <p className="muted missing-permission">{t('missing.searchPermission')}</p>}
     {preview && <div className="search-preview" role="status"><div><strong>{t('missing.previewTitle', { count: preview.value.targetCount })}</strong><p>{preview.value.excludedCount > 0 ? t('missing.previewExcluded', { count: preview.value.excludedCount }) : t('missing.previewReady')}</p></div><div><button className="secondary" onClick={() => setPreview(null)} type="button">{t('missing.cancel')}</button><button disabled={preview.value.targetCount === 0 || searchState === 'starting'} onClick={() => void start()} type="button"><Play size={16} />{t('missing.confirmSearch')}</button></div></div>}

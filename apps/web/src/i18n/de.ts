@@ -54,7 +54,7 @@ export const de = {
     eyebrow: 'FEHLEND', title: 'Fehlende Medien', search: 'Titel filtern', failed: 'Fehlende Medien konnten nicht geladen werden.',
     emptyTitle: 'Keine fehlenden Medien', emptyBody: 'Eine vollständige Anbieter-Synchronisierung hat keine fehlenden Medien gemeldet.',
     fresh: 'Aktuell', stale: 'Veraltet',
-    items: 'Einträge', serviceScope: 'Dienstbereich', allServices: 'Alle Dienste', searchAll: 'Alle fehlenden suchen',
+    items: 'Einträge', serviceScope: 'Dienstbereich', allServices: 'Alle Dienste', sync: 'Sync', searchAll: 'Alle fehlenden suchen',
     searchService: 'Diesen Dienst durchsuchen', searchSelected: 'Auswahl suchen ({{count}})',
     searchPermission: 'Zum Starten von Anbietersuchen ist die Berechtigung search.execute erforderlich.',
     previewTitle: '{{count}} fehlende Einträge suchen?', previewReady: 'Dadurch werden Anbietersuchen in den zugehörigen Arr-Diensten eingereiht.',

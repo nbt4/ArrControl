@@ -54,7 +54,7 @@ export const en = {
     eyebrow: 'MISSING', title: 'Missing media', search: 'Filter titles', failed: 'Missing media could not be loaded.',
     emptyTitle: 'No missing media', emptyBody: 'A completed provider synchronization has not reported any missing media.',
     fresh: 'Fresh', stale: 'Stale',
-    items: 'items', serviceScope: 'Service scope', allServices: 'All services', searchAll: 'Search all missing',
+    items: 'items', serviceScope: 'Service scope', allServices: 'All services', sync: 'Sync', searchAll: 'Search all missing',
     searchService: 'Search this service', searchSelected: 'Search selected ({{count}})',
     searchPermission: 'A search.execute permission is required to start provider searches.',
     previewTitle: 'Search {{count}} missing item(s)?', previewReady: 'This queues provider searches in the corresponding Arr services.',
