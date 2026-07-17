@@ -19,6 +19,10 @@ Status: technically ready for a tagged release after independent human security 
 
 The focused 2026-07-16 contract run passed 111/111 tests with no skips. Fixtures are synthetic-minimal redacted projections of the linked official tagged contracts in `docs/PROVIDERS.md`.
 
+This is adapter compatibility evidence, not a browser-UI availability list. Bazarr,
+Plex, Jellyfin, Emby, Overseerr, Jellyseerr/Seerr, and Ombi are not selectable
+from the web service form until each has a corresponding operational workflow.
+
 | Provider | Fixture versions | Contracted v1 slice |
 | --- | --- | --- |
 | Sonarr | 4.0.1.1168, 4.0.19.2979 | probe, health, catalog/missing, queue/history, missing-ID search |

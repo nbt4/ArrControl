@@ -1,6 +1,11 @@
 # ArrControl
 
-ArrControl is a self-hosted control centre for Arr services, download clients, and media servers. One web interface combines missing items, queues, history, health, and connected services.
+ArrControl is a self-hosted control centre for Arr services, Prowlarr, and download clients. One web interface combines missing items, queues, history, health, and connected services.
+
+The web service selector currently offers Sonarr, Radarr, Lidarr, Readarr,
+Whisparr, Prowlarr, SABnzbd, NZBGet, qBittorrent, Transmission, and Deluge.
+Media servers and request managers are not selectable in the UI until they have
+their own operational workflow.
 
 ## Run it online with Docker
 
@@ -87,7 +92,7 @@ Back up both `${ARRCONTROL_DATA_DIR}/postgres` and `${ARRCONTROL_DATA_DIR}/data-
 
 | Tag | Intended use |
 | --- | --- |
-| `nobentie/arrcontrol:1.0.6` | Pinned production release |
+| `nobentie/arrcontrol:1.0.7` | Pinned production release |
 | `nobentie/arrcontrol:1.0` | Current 1.0 release line |
 | `nobentie/arrcontrol:latest` | Evaluation / newest release |
 

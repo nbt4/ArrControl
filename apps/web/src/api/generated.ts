@@ -830,7 +830,7 @@ export interface components {
             updatedAt: string;
         };
         /**
-         * @description Configuration kinds are not a support claim; see the provider compatibility matrix for contract-tested adapters.
+         * @description API kinds include retained adapter-only values for existing installations. The browser selector offers only Sonarr
          * @enum {string}
          */
         InstanceKind: "bazarr" | "deluge" | "emby" | "jellyfin" | "jellyseerr" | "lidarr" | "nzbget" | "ombi" | "overseerr" | "plex" | "prowlarr" | "qbittorrent" | "radarr" | "readarr" | "sabnzbd" | "sonarr" | "transmission" | "whisparr";
