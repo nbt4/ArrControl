@@ -1,14 +1,14 @@
 import React, { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
-  Activity, AlertTriangle, CheckCircle2, Database, FileDown, KeyRound, Languages, LoaderCircle, Play,
+  Activity, AlertTriangle, CheckCircle2, Database, FileDown, KeyRound, Languages, LoaderCircle, Play, Search,
   LockKeyhole, LogIn, LogOut, RefreshCw, Server, ShieldCheck, ShieldOff,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import type { AuditEvent, AutomationJobSchedule, DashboardSnapshot, HealthIncident, HistoryItem, InstanceKind, InstanceSummary, MissingPage, QueueItem } from './api/client';
+import type { AuditEvent, AutomationJobSchedule, DashboardSnapshot, HealthIncident, HistoryItem, InstanceKind, InstanceSummary, MissingPage, QueueItem, SearchRequest, SearchScopePreview } from './api/client';
 import {
   createInstance, deleteInstance, exportDiagnostics, listAutomationJobs, listHistory, listMissing, listQueue, loadDashboard, login, logout, probeInstance, putApiKey, setHealthAcknowledgement, setHealthSnooze, startAutomationJob, updateInstance,
-  updatePreferences,
+  previewSearch, startSearch, updatePreferences,
 } from './api/client';
 import { buildDashboardMetrics } from './dashboard';
 import i18n, {
@@ -25,8 +25,13 @@ type ViewState =
 type Page = 'overview' | 'missing' | 'queue' | 'history' | 'health' | 'jobs' | 'audit' | 'settings';
 
 function pageFromHash(): Page {
-  const value = window.location.hash.slice(1);
+  const value = window.location.hash.slice(1).split('?')[0];
   return ['missing', 'queue', 'history', 'health', 'jobs', 'audit', 'settings'].includes(value) ? value as Page : 'overview';
+}
+
+function missingInstanceFromHash(): string | null {
+  if (pageFromHash() !== 'missing') return null;
+  return new URLSearchParams(window.location.hash.split('?')[1] ?? '').get('instance');
 }
 
 const metricIcons = [Activity, Server, KeyRound, ShieldCheck] as const;
@@ -41,6 +46,7 @@ function App() {
   const [view, setView] = useState<ViewState>({ kind: 'loading' });
   const [refreshKey, setRefreshKey] = useState(0);
   const [page, setPage] = useState<Page>(pageFromHash);
+  const [missingInstanceId, setMissingInstanceId] = useState<string | null>(missingInstanceFromHash);
   const [localTimeZone, setLocalTimeZone] = useState(readStoredTimeZone);
   const refresh = useCallback(() => {
     setView({ kind: 'loading' });
@@ -67,7 +73,10 @@ function App() {
   }, [refreshKey]);
 
   useEffect(() => {
-    const onHashChange = () => setPage(pageFromHash());
+    const onHashChange = () => {
+      setPage(pageFromHash());
+      setMissingInstanceId(missingInstanceFromHash());
+    };
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
@@ -143,17 +152,22 @@ function App() {
         </header>
         {view.kind === 'loading' && <LoadingState />}
         {view.kind === 'error' && <ErrorState retry={refresh} />}
-        {view.kind === 'ready' && <PageContent page={page} refresh={refresh} snapshot={view.snapshot} timeZone={localTimeZone} />}
+        {view.kind === 'ready' && <PageContent page={page} missingInstanceId={missingInstanceId} refresh={refresh} snapshot={view.snapshot} timeZone={localTimeZone} />}
       </main>
       </div>
     </>
   );
 }
 
-function PageContent({ page, refresh, snapshot, timeZone }: {
-  page: Page; refresh: () => void; snapshot: DashboardSnapshot; timeZone: string;
+function PageContent({ page, missingInstanceId, refresh, snapshot, timeZone }: {
+  page: Page; missingInstanceId: string | null; refresh: () => void; snapshot: DashboardSnapshot; timeZone: string;
 }) {
-  if (page === 'missing') return <MissingScreen authorized={snapshot.authorization !== null} />;
+  if (page === 'missing') return <MissingScreen
+    authorized={snapshot.authorization !== null}
+    canSearch={snapshot.authorization?.permissions.some((grant) => grant.code === 'search.execute') ?? false}
+    initialInstanceId={missingInstanceId}
+    instances={snapshot.instances ?? []}
+  />;
   if (page === 'queue') return <QueueScreen authorized={snapshot.authorization !== null} />;
   if (page === 'history') return <HistoryScreen authorized={snapshot.authorization !== null} timeZone={timeZone} />;
   if (page === 'health') return snapshot.authorization && snapshot.incidents
@@ -208,15 +222,21 @@ function PreferenceControls({ locale, timeZone, onSave }: {
   );
 }
 
-function MissingScreen({ authorized }: { authorized: boolean }) {
+function MissingScreen({ authorized, canSearch, initialInstanceId, instances }: {
+  authorized: boolean; canSearch: boolean; initialInstanceId: string | null; instances: readonly InstanceSummary[];
+}) {
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
   const [data, setData] = useState<MissingPage | null>(null);
   const [failed, setFailed] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<readonly string[]>([]);
+  const [preview, setPreview] = useState<{ request: SearchRequest; value: SearchScopePreview } | null>(null);
+  const [searchState, setSearchState] = useState<'idle' | 'previewing' | 'starting' | 'failed' | 'started'>('idle');
+  const selectedInstance = instances.find((instance) => instance.id === initialInstanceId) ?? null;
   useEffect(() => {
     if (!authorized) return;
     const controller = new AbortController();
-    listMissing(search)
+    listMissing({ search, ...(selectedInstance ? { instanceIds: [selectedInstance.id] } : {}) })
       .then((response) => {
         if (controller.signal.aborted) return;
         setData(response);
@@ -224,10 +244,40 @@ function MissingScreen({ authorized }: { authorized: boolean }) {
       })
       .catch(() => { if (!controller.signal.aborted) setFailed(true); });
     return () => controller.abort();
-  }, [authorized, search]);
+  }, [authorized, search, selectedInstance]);
+  const toggle = (id: string) => setSelectedIds((current) => current.includes(id)
+    ? current.filter((value) => value !== id) : [...current, id]);
+  const requestPreview = async (request: SearchRequest) => {
+    setSearchState('previewing'); setPreview(null);
+    try { setPreview({ request, value: await previewSearch(request) }); setSearchState('idle'); }
+    catch { setSearchState('failed'); }
+  };
+  const start = async () => {
+    if (!preview) return;
+    setSearchState('starting');
+    try { await startSearch(preview.request); setSearchState('started'); setPreview(null); }
+    catch { setSearchState('failed'); }
+  };
   if (!authorized) return <LoginPanel onSuccess={() => window.location.reload()} />;
-  return <section className="workspace" id="missing"><div className="panel-heading"><div><p className="eyebrow">{t('missing.eyebrow')}</p><h2>{t('missing.title')}</h2></div><input aria-label={t('missing.search')} onChange={(event) => setSearch(event.target.value)} placeholder={t('missing.search')} value={search} /></div>
-    {failed ? <p className="form-error">{t('missing.failed')}</p> : data === null ? <LoadingState /> : data.items.length === 0 ? <Notice icon={CheckCircle2} title={t('missing.emptyTitle')}>{t('missing.emptyBody')}</Notice> : <div className="data-list">{data.items.map((item) => <article className="data-row" key={item.id}><div><strong>{item.title}</strong><p>{item.instanceName} · {item.kind} · {item.reason}</p></div><div className="service-flags"><StatusPill good={!item.stale} label={item.stale ? t('missing.stale') : t('missing.fresh')} /></div></article>)}</div>}
+  return <section className="workspace missing-workspace" id="missing">
+    <div className="panel-heading missing-heading"><div><p className="eyebrow">{t('missing.eyebrow')}</p><h2>{t('missing.title')}</h2></div><span className="pill">{data?.items.length ?? 0} {t('missing.items')}</span></div>
+    <div className="service-tabs" aria-label={t('missing.serviceScope')}>
+      <a className={selectedInstance === null ? 'active' : ''} href="#missing">{t('missing.allServices')}</a>
+      {instances.filter((instance) => instance.enabled).map((instance) => <a className={selectedInstance?.id === instance.id ? 'active' : ''} href={`#missing?instance=${encodeURIComponent(instance.id)}`} key={instance.id}>{instance.name}</a>)}
+    </div>
+    <div className="missing-toolbar">
+      <label className="search-field"><Search size={16} /><span className="sr-only">{t('missing.search')}</span><input onChange={(event) => setSearch(event.target.value)} placeholder={t('missing.search')} value={search} /></label>
+      {canSearch && <div className="missing-actions">
+        <button className="secondary" disabled={searchState === 'previewing' || searchState === 'starting'} onClick={() => void requestPreview(selectedInstance
+          ? { mode: 'instance', instanceIds: [selectedInstance.id], dryRun: false }
+          : { mode: 'all', dryRun: false })} type="button"><Search size={16} />{selectedInstance ? t('missing.searchService') : t('missing.searchAll')}</button>
+        <button disabled={selectedIds.length === 0 || searchState === 'previewing' || searchState === 'starting'} onClick={() => void requestPreview({ mode: 'selected', mediaEntityIds: [...selectedIds], dryRun: false })} type="button"><Search size={16} />{t('missing.searchSelected', { count: selectedIds.length })}</button>
+      </div>}
+    </div>
+    {!canSearch && <p className="muted missing-permission">{t('missing.searchPermission')}</p>}
+    {preview && <div className="search-preview" role="status"><div><strong>{t('missing.previewTitle', { count: preview.value.targetCount })}</strong><p>{preview.value.excludedCount > 0 ? t('missing.previewExcluded', { count: preview.value.excludedCount }) : t('missing.previewReady')}</p></div><div><button className="secondary" onClick={() => setPreview(null)} type="button">{t('missing.cancel')}</button><button disabled={preview.value.targetCount === 0 || searchState === 'starting'} onClick={() => void start()} type="button"><Play size={16} />{t('missing.confirmSearch')}</button></div></div>}
+    {searchState === 'started' && <p className="search-started" role="status">{t('missing.searchStarted')}</p>}
+    {failed || searchState === 'failed' ? <p className="form-error" role="alert">{t(failed ? 'missing.failed' : 'missing.searchFailed')}</p> : data === null ? <LoadingState /> : data.items.length === 0 ? <Notice icon={CheckCircle2} title={t('missing.emptyTitle')}>{t('missing.emptyBody')}</Notice> : <div className="missing-table-wrap"><table className="missing-table"><thead><tr><th><input aria-label={t('missing.selectAll')} checked={data.items.length > 0 && data.items.every((item) => selectedIds.includes(item.id))} onChange={(event) => setSelectedIds(event.target.checked ? data.items.map((item) => item.id) : [])} type="checkbox" /></th><th>{t('missing.titleColumn')}</th><th>{t('missing.typeColumn')}</th><th>{t('missing.serviceColumn')}</th><th>{t('missing.statusColumn')}</th></tr></thead><tbody>{data.items.map((item) => <tr key={item.id}><td><input aria-label={t('missing.selectItem', { title: item.title })} checked={selectedIds.includes(item.id)} onChange={() => toggle(item.id)} type="checkbox" /></td><td><strong>{item.title}</strong><span>{[item.year, item.seasonNumber === null ? null : `S${item.seasonNumber.toString().padStart(2, '0')}`, item.episodeNumber === null ? null : `E${item.episodeNumber.toString().padStart(2, '0')}`].filter(Boolean).join(' · ')}</span></td><td><span className="kind-badge">{item.kind}</span><small>{item.reason}</small></td><td><a href={`#missing?instance=${encodeURIComponent(item.instanceId)}`}>{item.instanceName}</a><small>{item.providerKind}</small></td><td><StatusPill good={!item.stale} label={item.stale ? t('missing.stale') : t('missing.fresh')} /></td></tr>)}</tbody></table></div>}
   </section>;
 }
 
@@ -538,7 +588,7 @@ function InstanceRow({ canManage, instance, onChanged }: {
   return (
         <article className="instance-row">
           <div className="service-mark"><Server size={20} /></div>
-          <div className="service-copy"><div><h3>{instance.name}</h3><span>{instance.kind}</span></div><p>{new URL(instance.baseUrl).host}</p></div>
+          <div className="service-copy"><div><h3><a href={`#missing?instance=${encodeURIComponent(instance.id)}`}>{instance.name}</a></h3><span>{instance.kind}</span></div><p>{new URL(instance.baseUrl).host}</p></div>
           <div className="service-flags">
             <StatusPill good={instance.enabled} label={t(instance.enabled ? 'instance.enabled' : 'instance.disabled')} />
             <StatusPill good={instance.credentialsConfigured} label={t(instance.credentialsConfigured ? 'instance.keyConfigured' : 'instance.keyMissing')} />

@@ -87,11 +87,11 @@ Back up both `${ARRCONTROL_DATA_DIR}/postgres` and `${ARRCONTROL_DATA_DIR}/data-
 
 | Tag | Intended use |
 | --- | --- |
-| `nobentie/arrcontrol:1.0.0` | Pinned production release |
+| `nobentie/arrcontrol:1.0.2` | Pinned production release |
 | `nobentie/arrcontrol:1.0` | Current 1.0 release line |
 | `nobentie/arrcontrol:latest` | Evaluation / newest release |
 
-Images support `linux/amd64` and `linux/arm64`.
+The current manually published image targets `linux/amd64`.
 
 ## Documentation
 

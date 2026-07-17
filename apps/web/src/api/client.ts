@@ -11,6 +11,8 @@ export type UserPreferences = components['schemas']['UserPreferences'];
 export type HealthIncident = components['schemas']['HealthIncident'];
 export type AuditEvent = components['schemas']['AuditEvent'];
 export type MissingPage = components['schemas']['MissingPage'];
+export type SearchRequest = components['schemas']['SearchRequest'];
+export type SearchScopePreview = components['schemas']['SearchScopePreview'];
 export type QueueItem = components['schemas']['AggregatedQueueItem'];
 export type HistoryItem = components['schemas']['AggregatedHistoryItem'];
 export type AutomationJobSchedule = components['schemas']['AutomationJobSchedule'];
@@ -207,10 +209,33 @@ export async function probeInstance(instanceId: string): Promise<components['sch
   return result.data;
 }
 
-export async function listMissing(search?: string): Promise<MissingPage> {
-  const result = await api.GET('/missing', { params: { query: { limit: 50, ...(search ? { search } : {}) } } });
+export async function listMissing(filter: { search?: string; instanceIds?: readonly string[] } = {}): Promise<MissingPage> {
+  const result = await api.GET('/missing', {
+    params: {
+      query: {
+        limit: 100,
+        ...(filter.search ? { search: filter.search } : {}),
+        ...(filter.instanceIds?.length ? { instanceId: [...filter.instanceIds] } : {}),
+      },
+    },
+  });
   if (!result.data) throw new Error('missing_unavailable');
   return result.data;
+}
+
+export async function previewSearch(request: SearchRequest): Promise<SearchScopePreview> {
+  const result = await api.POST('/operations/search/preview', { body: request });
+  if (!result.data) throw new Error('search_preview_failed');
+  return result.data;
+}
+
+export async function startSearch(request: SearchRequest): Promise<void> {
+  const token = await csrfToken();
+  const result = await api.POST('/operations/search', {
+    params: { header: { 'X-CSRF-Token': token, 'Idempotency-Key': crypto.randomUUID() } },
+    body: request,
+  });
+  if (!result.data) throw new Error('search_start_failed');
 }
 
 export async function listQueue(): Promise<readonly QueueItem[]> {
