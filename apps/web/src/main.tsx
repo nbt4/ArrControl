@@ -35,6 +35,7 @@ function missingInstanceFromHash(): string | null {
 }
 
 const metricIcons = [Activity, Server, KeyRound, ShieldCheck] as const;
+const missingProviderKinds: readonly InstanceKind[] = ['sonarr', 'radarr', 'lidarr', 'readarr', 'whisparr'];
 
 function readStoredTimeZone(): string {
   try { return localStorage.getItem(timeZoneStorageKey) || browserTimeZone(); }
@@ -213,7 +214,7 @@ function MissingScreen({ authorized, canSearch, initialInstanceId, instances }: 
   const [selectedIds, setSelectedIds] = useState<readonly string[]>([]);
   const [preview, setPreview] = useState<{ request: SearchRequest; value: SearchScopePreview } | null>(null);
   const [searchState, setSearchState] = useState<'idle' | 'previewing' | 'starting' | 'failed' | 'started'>('idle');
-  const selectedInstance = instances.find((instance) => instance.id === initialInstanceId) ?? null;
+  const selectedInstance = instances.find((instance) => instance.id === initialInstanceId && missingProviderKinds.includes(instance.kind)) ?? null;
   useEffect(() => {
     if (!authorized) return;
     const controller = new AbortController();
@@ -244,7 +245,7 @@ function MissingScreen({ authorized, canSearch, initialInstanceId, instances }: 
     <div className="panel-heading missing-heading"><div><p className="eyebrow">{t('missing.eyebrow')}</p><h2>{t('missing.title')}</h2></div><span className="pill">{data?.items.length ?? 0} {t('missing.items')}</span></div>
     <div className="service-tabs" aria-label={t('missing.serviceScope')}>
       <a className={selectedInstance === null ? 'active' : ''} href="#missing">{t('missing.allServices')}</a>
-      {instances.filter((instance) => instance.enabled).map((instance) => <a className={selectedInstance?.id === instance.id ? 'active' : ''} href={`#missing?instance=${encodeURIComponent(instance.id)}`} key={instance.id}>{instance.name}</a>)}
+      {instances.filter((instance) => instance.enabled && missingProviderKinds.includes(instance.kind)).map((instance) => <a className={selectedInstance?.id === instance.id ? 'active' : ''} href={`#missing?instance=${encodeURIComponent(instance.id)}`} key={instance.id}>{instance.name}</a>)}
     </div>
     <div className="missing-toolbar">
       <label className="search-field"><Search size={16} /><span className="sr-only">{t('missing.search')}</span><input onChange={(event) => setSearch(event.target.value)} placeholder={t('missing.search')} value={search} /></label>
@@ -572,7 +573,7 @@ function InstanceRow({ canManage, instance, onChanged }: {
   return (
         <article className="instance-row">
           <div className="service-mark"><Server size={20} /></div>
-          <div className="service-copy"><div><h3><a href={`#missing?instance=${encodeURIComponent(instance.id)}`}>{instance.name}</a></h3><span>{instance.kind}</span></div><p>{new URL(instance.baseUrl).host}</p></div>
+          <div className="service-copy"><div><h3>{missingProviderKinds.includes(instance.kind) ? <a href={`#missing?instance=${encodeURIComponent(instance.id)}`}>{instance.name}</a> : instance.name}</h3><span>{instance.kind}</span></div><p>{new URL(instance.baseUrl).host}</p></div>
           <div className="service-flags">
             <StatusPill good={instance.enabled} label={t(instance.enabled ? 'instance.enabled' : 'instance.disabled')} />
             <StatusPill good={instance.credentialsConfigured} label={t(instance.credentialsConfigured ? 'instance.keyConfigured' : 'instance.keyMissing')} />
