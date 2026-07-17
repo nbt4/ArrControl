@@ -262,7 +262,9 @@ function JobsScreen({ canManage, timeZone }: { canManage: boolean; timeZone: str
     setFailed(false);
     listAutomationJobs().then(setJobs).catch(() => setFailed(true));
   }, []);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    void listAutomationJobs().then(setJobs).catch(() => setFailed(true));
+  }, []);
   const start = async (scheduleId: string) => {
     setBusyId(scheduleId); setFailed(false);
     try { await startAutomationJob(scheduleId); await new Promise((resolve) => window.setTimeout(resolve, 350)); load(); }

@@ -87,14 +87,31 @@ jobs:
           cleanup() {
             docker logs arrcontrol-smoke || true
             docker rm --force arrcontrol-smoke || true
+            docker rm --force arrcontrol-smoke-db || true
+            docker network rm arrcontrol-smoke || true
           }
           trap cleanup EXIT
+          docker network create arrcontrol-smoke
+          docker run --detach --name arrcontrol-smoke-db \
+            --network arrcontrol-smoke \
+            --env POSTGRES_DB=arrcontrol \
+            --env POSTGRES_USER=arrcontrol \
+            --env POSTGRES_PASSWORD=smoke-test-password \
+            postgres:17-alpine
+          for attempt in {1..30}; do
+            if docker exec arrcontrol-smoke-db pg_isready -U arrcontrol -d arrcontrol >/dev/null; then
+              break
+            fi
+            test "$attempt" -lt 30
+            sleep 1
+          done
           test "$(docker image inspect arrcontrol:ci --format '{{.Config.User}}')" = "arrcontrol"
           docker run --detach --name arrcontrol-smoke \
+            --network arrcontrol-smoke \
             --read-only --tmpfs /tmp:rw,noexec,nosuid,size=64m \
             --publish 127.0.0.1:18080:8080 \
             --env ASPNETCORE_URLS=http://+:8080 \
-            --env ConnectionStrings__Database='Host=127.0.0.1;Database=unavailable' \
+            --env ConnectionStrings__Database='Host=arrcontrol-smoke-db;Database=arrcontrol;Username=arrcontrol;Password=smoke-test-password' \
             arrcontrol:ci
           for attempt in {1..30}; do
             if curl --fail --silent http://127.0.0.1:18080/health/live >/dev/null; then

@@ -40,14 +40,28 @@ jobs:
           docker network create arrcontrol-security-review
           cleanup() {
             docker rm --force arrcontrol-security-review-app >/dev/null 2>&1 || true
+            docker rm --force arrcontrol-security-review-db >/dev/null 2>&1 || true
             docker network rm arrcontrol-security-review >/dev/null 2>&1 || true
           }
           trap cleanup EXIT
+          docker run --detach --name arrcontrol-security-review-db \
+            --network arrcontrol-security-review \
+            --env POSTGRES_DB=arrcontrol \
+            --env POSTGRES_USER=arrcontrol \
+            --env POSTGRES_PASSWORD=security-review-password \
+            postgres:17-alpine
+          for attempt in {1..30}; do
+            if docker exec arrcontrol-security-review-db pg_isready -U arrcontrol -d arrcontrol >/dev/null; then
+              break
+            fi
+            test "${attempt}" -lt 30
+            sleep 1
+          done
           docker run --detach --name arrcontrol-security-review-app \
             --network arrcontrol-security-review \
             --read-only --tmpfs /tmp:rw,noexec,nosuid,size=64m \
             --env ASPNETCORE_URLS=http://+:8080 \
-            --env ConnectionStrings__Database='Host=127.0.0.1;Database=unavailable' \
+            --env ConnectionStrings__Database='Host=arrcontrol-security-review-db;Database=arrcontrol;Username=arrcontrol;Password=security-review-password' \
             arrcontrol:security-review
           for attempt in {1..30}; do
             if docker run --rm --network arrcontrol-security-review \
