@@ -4,7 +4,7 @@ ArrControl is a self-hosted control centre for Arr services, download clients, a
 
 ## Run it online with Docker
 
-ArrControl needs exactly two running containers: `arrcontrol` and PostgreSQL. The browser interface must be served through HTTPS because secure login cookies intentionally do not work over plain HTTP.
+ArrControl needs exactly two running containers: `arrcontrol` and PostgreSQL. Compose also runs a short-lived initialization container before ArrControl starts; it restricts ownership and permissions on the persistent Data Protection key ring. The browser interface must be served through HTTPS because secure login cookies intentionally do not work over plain HTTP.
 
 ### 1. Download the two configuration files
 

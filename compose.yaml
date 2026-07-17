@@ -1,4 +1,21 @@
 services:
+  arrcontrol-data-init:
+    image: busybox:1.37.0-musl
+    container_name: arrcontrol-data-init
+    restart: "no"
+    user: "0:0"
+    network_mode: none
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - |
+        mkdir -p /data-protection
+        chown -R 100:101 /data-protection
+        chmod 0700 /data-protection
+        find /data-protection -type f -exec chmod 0600 {} +
+    volumes:
+      - ${ARRCONTROL_DATA_DIR:?Set ARRCONTROL_DATA_DIR in .env}/data-protection:/data-protection
+
   arrcontrol-db:
     image: postgres:17-alpine
     container_name: arrcontrol-db
@@ -24,6 +41,8 @@ services:
     depends_on:
       arrcontrol-db:
         condition: service_healthy
+      arrcontrol-data-init:
+        condition: service_completed_successfully
     environment:
       ASPNETCORE_URLS: "http://+:${ARRCONTROL_HTTP_PORT:-8080}"
       ConnectionStrings__Database: Host=arrcontrol-db;Port=5432;Database=arrcontrol;Username=arrcontrol;Password=${ARRCONTROL_DB_PASSWORD}

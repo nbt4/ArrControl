@@ -213,7 +213,7 @@ public sealed class ArrProviderClientContractTests
     }
 
     [Fact]
-    public async Task Safe_transport_uses_header_auth_base_path_pinned_address_and_rate_metadata()
+    public async Task Safe_transport_uses_header_auth_query_free_policy_uri_pinned_address_and_rate_metadata()
     {
         using var listener = new TcpListener(IPAddress.Loopback, 0);
         listener.Start();
@@ -231,6 +231,7 @@ public sealed class ArrProviderClientContractTests
         using var response = await transport.GetAsync(
             connection,
             "api/v3/system/status",
+            new Dictionary<string, string> { ["page"] = "1" },
             CancellationToken.None);
         var requestText = await server;
 
@@ -238,10 +239,11 @@ public sealed class ArrProviderClientContractTests
         Assert.Equal(100, response.RateLimit?.Limit);
         Assert.Equal(0, response.RateLimit?.Remaining);
         Assert.Equal(TimeSpan.FromSeconds(20), response.RateLimit?.RetryAfter);
-        Assert.Contains("GET /sonarr/api/v3/system/status HTTP/1.1", requestText, StringComparison.Ordinal);
+        Assert.Contains("GET /sonarr/api/v3/system/status?page=1 HTTP/1.1", requestText, StringComparison.Ordinal);
         Assert.Contains("X-Api-Key: test-api-key-value", requestText, StringComparison.Ordinal);
         Assert.DoesNotContain("apikey=", requestText, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(1, policy.ResolutionCount);
+        Assert.Equal("", policy.LastUri?.Query);
     }
 
     private static IArrProviderClient CreateClient(
@@ -375,6 +377,7 @@ public sealed class ArrProviderClientContractTests
     private sealed class StubOutboundPolicy(IPAddress address) : IOutboundTargetPolicy
     {
         public int ResolutionCount { get; private set; }
+        public Uri? LastUri { get; private set; }
 
         public Task<ResolvedOutboundTarget> ResolveAsync(
             Uri uri,
@@ -382,6 +385,7 @@ public sealed class ArrProviderClientContractTests
             CancellationToken cancellationToken)
         {
             ResolutionCount++;
+            LastUri = uri;
             return Task.FromResult(new ResolvedOutboundTarget(uri, [address]));
         }
     }

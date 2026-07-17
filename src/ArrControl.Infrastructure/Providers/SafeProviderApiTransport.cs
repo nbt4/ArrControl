@@ -101,9 +101,13 @@ public sealed class SafeProviderApiTransport(IOutboundTargetPolicy outboundTarge
         if (body is { Length: > 1024 * 1024 })
             throw new ProviderTransportException(ProviderErrorCodes.InvalidResponse);
 
+        var target = await outboundTargetPolicy.ResolveAsync(
+            requestUri,
+            connection.AllowPrivateNetworkAccess,
+            cancellationToken);
         if (query.Count > 0)
         {
-            var builder = new UriBuilder(requestUri)
+            var builder = new UriBuilder(target.Uri)
             {
                 Query = string.Join(
                     "&",
@@ -112,14 +116,13 @@ public sealed class SafeProviderApiTransport(IOutboundTargetPolicy outboundTarge
             };
             requestUri = builder.Uri;
         }
-
-        var target = await outboundTargetPolicy.ResolveAsync(
-            requestUri,
-            connection.AllowPrivateNetworkAccess,
-            cancellationToken);
+        else
+        {
+            requestUri = target.Uri;
+        }
         using var handler = CreateHandler(target, connection.TlsVerificationEnabled);
         using var client = new HttpClient(handler) { Timeout = Timeout.InfiniteTimeSpan };
-        using var request = new HttpRequestMessage(method, target.Uri)
+        using var request = new HttpRequestMessage(method, requestUri)
         {
             VersionPolicy = HttpVersionPolicy.RequestVersionOrLower,
         };
