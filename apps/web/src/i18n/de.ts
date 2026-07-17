@@ -66,11 +66,13 @@ export const de = {
   },
   queue: {
     eyebrow: 'WARTESCHLANGE', title: 'Aktuelle Warteschlange', failed: 'Warteschlangendaten konnten nicht geladen werden.', unknownProtocol: 'Unbekanntes Protokoll',
-    emptyTitle: 'Warteschlange ist leer', emptyBody: 'Derzeit sind keine sichtbaren Anbieter- oder Download-Client-Einträge projiziert.', fresh: 'Aktuell', stale: 'Veraltet',
+    emptyTitle: 'Warteschlange ist leer', emptyBody: 'Derzeit sind keine sichtbaren Anbieter-Einträge projiziert.', fresh: 'Aktuell', stale: 'Veraltet',
+    items: 'Einträge', serviceScope: 'Dienstbereich', sync: 'Sync', titleColumn: 'Titel', typeColumn: 'Typ', serviceColumn: 'Dienst', statusColumn: 'Status',
   },
   history: {
     eyebrow: 'VERLAUF', title: 'Letzte Aktivitäten', failed: 'Verlauf konnte nicht geladen werden.',
-    emptyTitle: 'Keine aktuellen Aktivitäten', emptyBody: 'Es wurden noch keine sichtbaren Anbieter-Aktivitäten projiziert.', fresh: 'Aktuell', stale: 'Veraltet',
+    emptyTitle: 'Keine aktuellen Aktivitäten', emptyBody: 'Es wurden noch keine sichtbaren Dienst-Aktivitäten projiziert.', fresh: 'Aktuell', stale: 'Veraltet',
+    items: 'Einträge', serviceScope: 'Dienstbereich', sync: 'Sync', titleColumn: 'Titel', eventColumn: 'Ereignis', serviceColumn: 'Dienst', timeColumn: 'Zeit', statusColumn: 'Status',
   },
   jobs: {
     eyebrow: 'AUTOMATISIERUNG', title: 'Job-Steuerung', description: 'Dauerhafte Zeitpläne prüfen und bei Bedarf eine sofortige Ausführung einreihen.',

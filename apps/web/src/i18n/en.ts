@@ -66,11 +66,13 @@ export const en = {
   },
   queue: {
     eyebrow: 'QUEUE', title: 'Current queue', failed: 'Queue data could not be loaded.', unknownProtocol: 'Unknown protocol',
-    emptyTitle: 'Queue is empty', emptyBody: 'No visible provider or download-client queue entries are currently projected.', fresh: 'Fresh', stale: 'Stale',
+    emptyTitle: 'Queue is empty', emptyBody: 'No visible provider queue entries are currently projected.', fresh: 'Fresh', stale: 'Stale',
+    items: 'items', serviceScope: 'Service scope', sync: 'Sync', titleColumn: 'Title', typeColumn: 'Type', serviceColumn: 'Service', statusColumn: 'Status',
   },
   history: {
     eyebrow: 'HISTORY', title: 'Recent activity', failed: 'History could not be loaded.',
-    emptyTitle: 'No recent activity', emptyBody: 'No visible provider activity has been projected yet.', fresh: 'Fresh', stale: 'Stale',
+    emptyTitle: 'No recent activity', emptyBody: 'No visible service activity has been projected yet.', fresh: 'Fresh', stale: 'Stale',
+    items: 'items', serviceScope: 'Service scope', sync: 'Sync', titleColumn: 'Title', eventColumn: 'Event', serviceColumn: 'Service', timeColumn: 'Time', statusColumn: 'Status',
   },
   jobs: {
     eyebrow: 'AUTOMATION', title: 'Job control', description: 'Review durable schedules and queue an immediate execution when needed.',

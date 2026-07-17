@@ -18,7 +18,7 @@ The 100,000-row capacity suite is deliberately opt-in: set `ARRCONTROL_RUN_PERFO
 
 Before the first Compose start, generate the mounted credential key once with `umask 077; mkdir -p secrets; openssl rand -base64 32 > secrets/arrcontrol-master-key`. The `secrets/` directory is excluded from Git and the container build context; never commit or log its contents. Without credential-key settings the API may start for read-only metadata, but credential writes return `503 credential_encryption_unavailable` and provider reads fail closed.
 
-Provider credentials are stored as independent write-only `api-key`, `username`, or `password` purposes. The web UI configures API keys for Arr/Prowlarr/SABnzbd, username and password for NZBGet/qBittorrent/Transmission, and the Web password for Deluge. Metadata reads show only whether a purpose is configured. Adapter-only provider contracts may define additional credentials, but those providers are not web-selectable until their data has an operational UI workflow.
+Provider credentials are stored as independent write-only `api-key`, `username`, or `password` purposes. The web UI configures API keys for Arr/Prowlarr. Metadata reads show only whether a purpose is configured. Download-client and other adapter-only provider contracts may define additional credentials, but those providers are not web-selectable until their data has an operational UI workflow.
 
 Branch names use `feature/`, `fix/`, or `docs/`. Conventional Commits are recommended. A change is done when tests, docs/API contract, localization, migration impact, threat impact, and observability are addressed. Generated clients are reproducible and never hand-edited.
 

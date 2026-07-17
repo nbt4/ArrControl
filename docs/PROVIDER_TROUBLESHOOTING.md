@@ -20,18 +20,13 @@ Start with the stable ArrControl outcome, not an upstream response body. Use a r
 ## Provider families
 
 This table covers the provider kinds available from the browser service selector.
-Bazarr, media-server, and request-manager adapters are contract evidence only at
-present; they are not selectable in the web UI.
+Download-client, Bazarr, media-server, and request-manager adapters are
+contract evidence only at present; they are not selectable in the web UI.
 
 | Family | Required credentials / base URL | Common contract checks | Family-specific notes |
 | --- | --- | --- | --- |
 | Sonarr/Radarr/Lidarr/Readarr/Whisparr | `api-key`; server root including any intentional base path | Exact product and tested major; `/api/v3` for Sonarr/Radarr/Whisparr, `/api/v1` for Lidarr/Readarr | A partial/oversized catalog rejects the whole snapshot and retains old data. Search payloads are bounded IDs only. |
 | Prowlarr | `api-key`; server root/base path | Prowlarr major 2 | Prowlarr discards indexer configuration and query data. |
-| SABnzbd | `api-key`; server root | Major 4/5 | Official API requires the key in a query; ArrControl redacts all request query rendering. Retry applies only to documented failed jobs. |
-| NZBGet | `username` + `password`; RPC root | Major 25/26, Basic auth | Verify RPC account permissions and server clock; do not confuse web UI and RPC credentials. |
-| qBittorrent | `username` + `password`; Web UI root | Major 5, login cookie | Reverse-proxy base path/cookie behavior must remain same-origin; ArrControl does not retain the cookie beyond the call sequence. |
-| Transmission | `username` + `password`; RPC URL/root configured as documented | Major 4, 409 session header challenge | A bounded `X-Transmission-Session-Id` is expected; repeated 409 after retry indicates proxy/session mismatch. |
-| Deluge | Web `password`; Web JSON-RPC root | Major 2 | Use the Deluge Web password, not a daemon auth-file line. |
 | Recyclarr | No HTTP instance; trusted executable/config absolute paths | CLI major 7/8, `--version` before sync | Baseline image does not bundle it. Preview first; non-preview mutates Sonarr/Radarr configuration. Never pass free-form shell text. |
 
 ## Notifications

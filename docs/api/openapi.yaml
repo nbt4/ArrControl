@@ -755,7 +755,7 @@ components:
         purpose: { $ref: '#/components/schemas/CredentialPurpose' }
         configured: { const: true }
         updatedAt: { type: string, format: date-time }
-    InstanceKind: { type: string, enum: [bazarr,deluge,emby,jellyfin,jellyseerr,lidarr,nzbget,ombi,overseerr,plex,prowlarr,qbittorrent,radarr,readarr,sabnzbd,sonarr,transmission,whisparr], description: API kinds include retained adapter-only values for existing installations. The browser selector offers only Sonarr, Radarr, Lidarr, Readarr, Whisparr, Prowlarr, SABnzbd, NZBGet, qBittorrent, Transmission, and Deluge; see the provider compatibility matrix. }
+    InstanceKind: { type: string, enum: [bazarr,deluge,emby,jellyfin,jellyseerr,lidarr,nzbget,ombi,overseerr,plex,prowlarr,qbittorrent,radarr,readarr,sabnzbd,sonarr,transmission,whisparr], description: API kinds include retained adapter-only values for existing installations. The browser selector offers only Sonarr, Radarr, Lidarr, Readarr, Whisparr, and Prowlarr; see the provider compatibility matrix. }
     InstanceSummary:
       type: object
       additionalProperties: false

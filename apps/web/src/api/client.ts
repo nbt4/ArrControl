@@ -238,14 +238,14 @@ export async function startSearch(request: SearchRequest): Promise<void> {
   if (!result.data) throw new Error('search_start_failed');
 }
 
-export async function listQueue(): Promise<readonly QueueItem[]> {
-  const result = await api.GET('/queue');
+export async function listQueue(filter: { instanceIds?: readonly string[] } = {}): Promise<readonly QueueItem[]> {
+  const result = await api.GET('/queue', { params: { query: filter.instanceIds?.length ? { instanceId: [...filter.instanceIds] } : {} } });
   if (!result.data) throw new Error('queue_unavailable');
   return result.data;
 }
 
-export async function listHistory(): Promise<readonly HistoryItem[]> {
-  const result = await api.GET('/history', { params: { query: { limit: 100 } } });
+export async function listHistory(filter: { instanceIds?: readonly string[] } = {}): Promise<readonly HistoryItem[]> {
+  const result = await api.GET('/history', { params: { query: { limit: 100, ...(filter.instanceIds?.length ? { instanceId: [...filter.instanceIds] } : {}) } } });
   if (!result.data) throw new Error('history_unavailable');
   return result.data;
 }

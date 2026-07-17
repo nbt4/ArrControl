@@ -5,11 +5,11 @@ Operational diagnosis by stable outcome and provider family is in `docs/PROVIDER
 ## Service selection in the web UI
 
 The service selector exposes only providers with a reachable operational view:
-Sonarr, Radarr, Lidarr, Readarr, Whisparr, Prowlarr, SABnzbd, NZBGet,
-qBittorrent, Transmission, and Deluge. The Arr providers supply catalog/missing
-items and search; Prowlarr and download clients supply queue/history data.
-Adapters for media servers, request managers, and Bazarr remain contract-tested
-but are not selectable until their data has a corresponding UI workflow.
+Sonarr, Radarr, Lidarr, Readarr, Whisparr, and Prowlarr. The Arr providers
+supply catalog/missing items and search; Prowlarr supplies indexer history.
+Download-client, media-server, request-manager, and Bazarr adapters remain
+contract-tested but are not selectable until their data has a corresponding UI
+workflow.
 
 ## Contract
 

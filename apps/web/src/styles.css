@@ -136,6 +136,7 @@ h3 { margin: 0; }
 .service-tabs a { color: var(--muted); text-decoration: none; white-space: nowrap; padding: 6px 9px; border-radius: 5px; font-size: 12px; }
 .service-tabs a:hover, .service-tabs a.active { color: #effff9; background: #1a3029; }
 .missing-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 20px; border-bottom: 1px solid var(--line); }
+.listing-toolbar { display: flex; justify-content: flex-end; padding: 10px 20px; border-bottom: 1px solid var(--line); }
 .search-field { display: flex; align-items: center; gap: 8px; min-width: min(360px, 100%); padding: 0 9px; border: 1px solid #303a42; border-radius: 6px; background: #0b1014; color: var(--muted); }
 .search-field input { min-width: 0; width: 100%; border: 0; outline: 0; background: transparent; color: #f2f6f8; padding: 8px 0; font-size: 13px; }
 .missing-actions { display: flex; gap: 7px; flex-wrap: wrap; justify-content: end; }

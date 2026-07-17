@@ -29,13 +29,14 @@ function pageFromHash(): Page {
   return ['missing', 'queue', 'history', 'health', 'jobs', 'audit', 'settings'].includes(value) ? value as Page : 'overview';
 }
 
-function missingInstanceFromHash(): string | null {
-  if (pageFromHash() !== 'missing') return null;
+function instanceFromHash(): string | null {
+  if (!['missing', 'queue', 'history'].includes(pageFromHash())) return null;
   return new URLSearchParams(window.location.hash.split('?')[1] ?? '').get('instance');
 }
 
 const metricIcons = [Activity, Server, KeyRound, ShieldCheck] as const;
 const missingProviderKinds: readonly InstanceKind[] = ['sonarr', 'radarr', 'lidarr', 'readarr', 'whisparr'];
+const workspaceProviderKinds: readonly InstanceKind[] = [...missingProviderKinds, 'prowlarr'];
 
 function readStoredTimeZone(): string {
   try { return localStorage.getItem(timeZoneStorageKey) || browserTimeZone(); }
@@ -47,7 +48,7 @@ function App() {
   const [view, setView] = useState<ViewState>({ kind: 'loading' });
   const [refreshKey, setRefreshKey] = useState(0);
   const [page, setPage] = useState<Page>(pageFromHash);
-  const [missingInstanceId, setMissingInstanceId] = useState<string | null>(missingInstanceFromHash);
+  const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(instanceFromHash);
   const [localTimeZone, setLocalTimeZone] = useState(readStoredTimeZone);
   const refresh = useCallback(() => {
     setView({ kind: 'loading' });
@@ -76,7 +77,7 @@ function App() {
   useEffect(() => {
     const onHashChange = () => {
       setPage(pageFromHash());
-      setMissingInstanceId(missingInstanceFromHash());
+      setSelectedInstanceId(instanceFromHash());
     };
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);
@@ -133,24 +134,24 @@ function App() {
         </header>
         {view.kind === 'loading' && <LoadingState />}
         {view.kind === 'error' && <ErrorState retry={refresh} />}
-        {view.kind === 'ready' && <PageContent page={page} missingInstanceId={missingInstanceId} refresh={refresh} snapshot={view.snapshot} timeZone={localTimeZone} />}
+        {view.kind === 'ready' && <PageContent page={page} selectedInstanceId={selectedInstanceId} refresh={refresh} snapshot={view.snapshot} timeZone={localTimeZone} />}
       </main>
       </div>
     </>
   );
 }
 
-function PageContent({ page, missingInstanceId, refresh, snapshot, timeZone }: {
-  page: Page; missingInstanceId: string | null; refresh: () => void; snapshot: DashboardSnapshot; timeZone: string;
+function PageContent({ page, selectedInstanceId, refresh, snapshot, timeZone }: {
+  page: Page; selectedInstanceId: string | null; refresh: () => void; snapshot: DashboardSnapshot; timeZone: string;
 }) {
   if (page === 'missing') return <MissingScreen
     authorized={snapshot.authorization !== null}
     canSearch={snapshot.authorization?.permissions.some((grant) => grant.code === 'search.execute') ?? false}
-    initialInstanceId={missingInstanceId}
+    initialInstanceId={selectedInstanceId}
     instances={snapshot.instances ?? []}
   />;
-  if (page === 'queue') return <QueueScreen authorized={snapshot.authorization !== null} />;
-  if (page === 'history') return <HistoryScreen authorized={snapshot.authorization !== null} timeZone={timeZone} />;
+  if (page === 'queue') return <QueueScreen authorized={snapshot.authorization !== null} initialInstanceId={selectedInstanceId} instances={snapshot.instances ?? []} />;
+  if (page === 'history') return <HistoryScreen authorized={snapshot.authorization !== null} initialInstanceId={selectedInstanceId} instances={snapshot.instances ?? []} timeZone={timeZone} />;
   if (page === 'health') return snapshot.authorization && snapshot.incidents
     ? <HealthPanel canManage={snapshot.authorization.permissions.some((grant) => grant.code === 'tasks.execute')} incidents={snapshot.incidents} onChanged={refresh} timeZone={timeZone} />
     : <LoginPanel onSuccess={refresh} />;
@@ -266,26 +267,58 @@ function MissingScreen({ authorized, canSearch, initialInstanceId, instances }: 
   </section>;
 }
 
-function QueueScreen({ authorized }: { authorized: boolean }) {
+function QueueScreen({ authorized, initialInstanceId, instances }: {
+  authorized: boolean; initialInstanceId: string | null; instances: readonly InstanceSummary[];
+}) {
   const { t } = useTranslation();
   const [items, setItems] = useState<readonly QueueItem[] | null>(null);
   const [failed, setFailed] = useState(false);
-  useEffect(() => { if (!authorized) return; listQueue().then(setItems).catch(() => setFailed(true)); }, [authorized]);
+  const [syncRevision, setSyncRevision] = useState(0);
+  const selectedInstance = instances.find((instance) => instance.id === initialInstanceId && workspaceProviderKinds.includes(instance.kind)) ?? null;
+  useEffect(() => {
+    if (!authorized) return;
+    listQueue(selectedInstance ? { instanceIds: [selectedInstance.id] } : {})
+      .then((data) => { setItems(data.filter((item) => workspaceProviderKinds.includes(item.providerKind))); setFailed(false); })
+      .catch(() => setFailed(true));
+  }, [authorized, selectedInstance, syncRevision]);
   if (!authorized) return <LoginPanel onSuccess={() => window.location.reload()} />;
-  return <section className="workspace" id="queue"><div className="panel-heading"><div><p className="eyebrow">{t('queue.eyebrow')}</p><h2>{t('queue.title')}</h2></div></div>
-    {failed ? <p className="form-error">{t('queue.failed')}</p> : items === null ? <LoadingState /> : items.length === 0 ? <Notice icon={CheckCircle2} title={t('queue.emptyTitle')}>{t('queue.emptyBody')}</Notice> : <div className="data-list">{items.map((item) => <article className="data-row" key={`${item.instanceId}:${item.providerKey}`}><div><strong>{item.title}</strong><p>{item.instanceName} · {item.status} · {item.protocol ?? t('queue.unknownProtocol')}</p></div><div className="service-flags"><StatusPill good={!item.stale} label={item.stale ? t('queue.stale') : t('queue.fresh')} /></div></article>)}</div>}
+  return <section className="workspace missing-workspace" id="queue"><div className="panel-heading missing-heading"><div><p className="eyebrow">{t('queue.eyebrow')}</p><h2>{t('queue.title')}</h2></div><span className="pill">{items?.length ?? 0} {t('queue.items')}</span></div>
+    <ServiceTabs activeInstanceId={selectedInstance?.id ?? null} instances={instances} page="queue" label={t('queue.serviceScope')} />
+    <div className="listing-toolbar"><button className="secondary" onClick={() => setSyncRevision((value) => value + 1)} type="button"><RefreshCw size={16} />{t('queue.sync')}</button></div>
+    {failed ? <p className="form-error" role="alert">{t('queue.failed')}</p> : items === null ? <LoadingState /> : items.length === 0 ? <Notice icon={CheckCircle2} title={t('queue.emptyTitle')}>{t('queue.emptyBody')}</Notice> : <div className="missing-table-wrap"><table className="missing-table"><thead><tr><th>{t('queue.titleColumn')}</th><th>{t('queue.typeColumn')}</th><th>{t('queue.serviceColumn')}</th><th>{t('queue.statusColumn')}</th></tr></thead><tbody>{items.map((item) => <tr key={`${item.instanceId}:${item.providerKey}`}><td><strong>{item.title}</strong><span>{item.protocol ?? t('queue.unknownProtocol')}</span></td><td><span className="kind-badge">{item.type}</span><small>{item.providerKind}</small></td><td><a href={`#queue?instance=${encodeURIComponent(item.instanceId)}`}>{item.instanceName}</a></td><td><strong>{item.status}</strong><StatusPill good={!item.stale} label={item.stale ? t('queue.stale') : t('queue.fresh')} /></td></tr>)}</tbody></table></div>}
   </section>;
 }
 
-function HistoryScreen({ authorized, timeZone }: { authorized: boolean; timeZone: string }) {
+function HistoryScreen({ authorized, initialInstanceId, instances, timeZone }: {
+  authorized: boolean; initialInstanceId: string | null; instances: readonly InstanceSummary[]; timeZone: string;
+}) {
   const { t, i18n: translation } = useTranslation();
   const [items, setItems] = useState<readonly HistoryItem[] | null>(null);
   const [failed, setFailed] = useState(false);
-  useEffect(() => { if (!authorized) return; listHistory().then(setItems).catch(() => setFailed(true)); }, [authorized]);
+  const [syncRevision, setSyncRevision] = useState(0);
+  const selectedInstance = instances.find((instance) => instance.id === initialInstanceId && workspaceProviderKinds.includes(instance.kind)) ?? null;
+  useEffect(() => {
+    if (!authorized) return;
+    listHistory(selectedInstance ? { instanceIds: [selectedInstance.id] } : {})
+      .then((data) => { setItems(data.filter((item) => workspaceProviderKinds.includes(item.providerKind))); setFailed(false); })
+      .catch(() => setFailed(true));
+  }, [authorized, selectedInstance, syncRevision]);
   if (!authorized) return <LoginPanel onSuccess={() => window.location.reload()} />;
-  return <section className="workspace" id="history"><div className="panel-heading"><div><p className="eyebrow">{t('history.eyebrow')}</p><h2>{t('history.title')}</h2></div></div>
-    {failed ? <p className="form-error">{t('history.failed')}</p> : items === null ? <LoadingState /> : items.length === 0 ? <Notice icon={CheckCircle2} title={t('history.emptyTitle')}>{t('history.emptyBody')}</Notice> : <div className="data-list">{items.map((item) => <article className="data-row" key={`${item.instanceId}:${item.providerKey}:${item.eventAt}`}><div><strong>{item.title}</strong><p>{item.instanceName} · {item.eventType} · {formatDateTime(item.eventAt, translation.resolvedLanguage ?? 'en', timeZone)}</p></div><div className="service-flags"><StatusPill good={!item.stale} label={item.stale ? t('history.stale') : t('history.fresh')} /></div></article>)}</div>}
+  return <section className="workspace missing-workspace" id="history"><div className="panel-heading missing-heading"><div><p className="eyebrow">{t('history.eyebrow')}</p><h2>{t('history.title')}</h2></div><span className="pill">{items?.length ?? 0} {t('history.items')}</span></div>
+    <ServiceTabs activeInstanceId={selectedInstance?.id ?? null} instances={instances} page="history" label={t('history.serviceScope')} />
+    <div className="listing-toolbar"><button className="secondary" onClick={() => setSyncRevision((value) => value + 1)} type="button"><RefreshCw size={16} />{t('history.sync')}</button></div>
+    {failed ? <p className="form-error" role="alert">{t('history.failed')}</p> : items === null ? <LoadingState /> : items.length === 0 ? <Notice icon={CheckCircle2} title={t('history.emptyTitle')}>{t('history.emptyBody')}</Notice> : <div className="missing-table-wrap"><table className="missing-table"><thead><tr><th>{t('history.titleColumn')}</th><th>{t('history.eventColumn')}</th><th>{t('history.serviceColumn')}</th><th>{t('history.timeColumn')}</th><th>{t('history.statusColumn')}</th></tr></thead><tbody>{items.map((item) => <tr key={`${item.instanceId}:${item.providerKey}:${item.eventAt}`}><td><strong>{item.title}</strong><span>{item.providerKind}</span></td><td><span className="kind-badge">{item.eventType}</span></td><td><a href={`#history?instance=${encodeURIComponent(item.instanceId)}`}>{item.instanceName}</a></td><td>{formatDateTime(item.eventAt, translation.resolvedLanguage ?? 'en', timeZone)}</td><td><StatusPill good={!item.stale} label={item.stale ? t('history.stale') : t('history.fresh')} /></td></tr>)}</tbody></table></div>}
   </section>;
+}
+
+function ServiceTabs({ activeInstanceId, instances, label, page }: {
+  activeInstanceId: string | null; instances: readonly InstanceSummary[]; label: string; page: 'queue' | 'history';
+}) {
+  const { t } = useTranslation();
+  return <div className="service-tabs" aria-label={label}>
+    <a className={activeInstanceId === null ? 'active' : ''} href={`#${page}`}>{t('missing.allServices')}</a>
+    {instances.filter((instance) => instance.enabled && workspaceProviderKinds.includes(instance.kind)).map((instance) => <a className={activeInstanceId === instance.id ? 'active' : ''} href={`#${page}?instance=${encodeURIComponent(instance.id)}`} key={instance.id}>{instance.name}</a>)}
+  </div>;
 }
 
 function JobsScreen({ canManage, timeZone }: { canManage: boolean; timeZone: string }) {
@@ -499,8 +532,7 @@ function AuthenticatedPanel({ canManage, email, instances, onChanged, onLogout }
 }
 
 const instanceKinds: readonly InstanceKind[] = [
-  'sonarr', 'radarr', 'lidarr', 'readarr', 'whisparr', 'prowlarr', 'sabnzbd', 'nzbget',
-  'qbittorrent', 'transmission', 'deluge',
+  'sonarr', 'radarr', 'lidarr', 'readarr', 'whisparr', 'prowlarr',
 ];
 
 function CreateInstanceForm({ onCreated }: { onCreated: () => void }) {
