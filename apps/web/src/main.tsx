@@ -81,26 +81,6 @@ function App() {
     return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
 
-  const liveUserId = view.kind === 'ready' ? view.snapshot.authorization?.userId : null;
-  const liveCursor = view.kind === 'ready' ? view.snapshot.liveCursor : null;
-  useEffect(() => {
-    if (!liveUserId || !liveCursor || page === 'missing') return undefined;
-    const source = new EventSource(`/api/v1/events?cursor=${encodeURIComponent(liveCursor)}`, {
-      withCredentials: true,
-    });
-    let pendingRefresh: number | undefined;
-    const scheduleRefresh = () => {
-      if (pendingRefresh !== undefined) return;
-      pendingRefresh = window.setTimeout(refresh, 250);
-    };
-    source.addEventListener('changed', scheduleRefresh);
-    source.addEventListener('snapshot-required', scheduleRefresh);
-    return () => {
-      source.close();
-      if (pendingRefresh !== undefined) window.clearTimeout(pendingRefresh);
-    };
-  }, [liveCursor, liveUserId, page, refresh]);
-
   const locale = normalizeLocale(i18n.resolvedLanguage);
   const authorization = view.kind === 'ready' ? view.snapshot.authorization : null;
   const pageTitle = page === 'overview' ? t('dashboard.title') : t(`app.navigation.${page}`);
